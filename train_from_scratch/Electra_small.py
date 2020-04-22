@@ -243,18 +243,18 @@ def train_validation(model_mlm, model_ce, train_dataloader, validation_dataloade
             for idx, batch_data in enumerate(validation_dataloader):
                 batch_data = batch_data.to(device)
 
-            outputs_mlm_val = model_mlm(batch_data, masked_lm_labels=batch_data)
-            loss_mlm_val = outputs_mlm_val[:1][0]
-            labels_ce_val, output_val_ = soft_max(batch_data, outputs_mlm_val)
+                outputs_mlm_val = model_mlm(batch_data, masked_lm_labels=batch_data)
+                loss_mlm_val = outputs_mlm_val[:1][0]
+                labels_ce_val, output_val_ = soft_max(batch_data, outputs_mlm_val)
 
-            outputs_ce_val = model_ce(output_val_, labels=labels_ce_val)
-            loss_ce_val = outputs_ce_val[:1][0]
+                outputs_ce_val = model_ce(output_val_, labels=labels_ce_val)
+                loss_ce_val = outputs_ce_val[:1][0]
 
-            loss_val = loss_mlm_val + lambda_ * loss_ce_val
+                loss_val = loss_mlm_val + lambda_ * loss_ce_val
 
-            loss_validation.append(loss_val.item())
-            print(
-                f'Epoch: {epoch + 1} | batch: {idx + 1}/{data_len_validation/batch_size} | Validation Loss: {loss_val.item():.4f}')
+                loss_validation.append(loss_val.item())
+                print(
+                    f'Epoch: {epoch + 1} | batch: {idx + 1}/{data_len_validation/batch_size} | Validation Loss: {loss_val.item():.4f}')
 
         # Save Models after each epoch.
         torch.save(model_mlm, "/content/drive/My Drive/Electra_mlm_{}.pt".format(epoch))

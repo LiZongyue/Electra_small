@@ -6,13 +6,7 @@ Original file is located at
 """
 
 # Commented out IPython magic to ensure Python compatibility.
-# %cd drive/My\ Drive/transformers-master/
 
-# pip install transformers
-
-# pip install .
-
-# pip install -r ./examples/requirements.txt
 
 import os
 import math

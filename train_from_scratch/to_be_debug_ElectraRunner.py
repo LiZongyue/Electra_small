@@ -94,7 +94,7 @@ class TextDataset(Dataset):
         return dataloader, data_len
 
 
-class Electra(object):
+class ElectraRunner(object):
 
     def __init__(self, model_config, train_config):
         self.model_config = model_config
@@ -260,7 +260,7 @@ def main():
     model_config = ElectraModelConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
-    electra = Electra(model_config, train_config)
+    electra = ElectraRunner(model_config, train_config)
 
     tokenizer = electra.__tokenizer_getter__()
 

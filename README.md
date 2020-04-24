@@ -1,5 +1,5 @@
 # Electra_small
-Train a Electra from scratch and fine tune it with GLUE
+Train a small Electra from scratch and fine tune it with GLUE.
 ## Install   
 
         $ pip install -r requirements.txt

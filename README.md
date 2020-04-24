@@ -1,9 +1,8 @@
 # Electra_small
 Train a Electra from scratch and fine tune it with GLUE
-## Install  
-1. Transformers  
+## Install   
 
-        $ pip install transformers
+        $ pip install -r requirements.txt
         
 
 ## Train Electra from Scratch  

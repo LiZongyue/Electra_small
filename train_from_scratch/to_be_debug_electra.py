@@ -24,7 +24,7 @@ class TextDataset(Dataset):
 
     def __init__(self, tokenizer, train_config, file_path: str, block_size=512):
         self.train_config = train_config
-        
+
         assert os.path.isfile(file_path)
 
         block_size = block_size - (tokenizer.max_len - tokenizer.max_len_single_sentence)
@@ -68,8 +68,9 @@ class TextDataset(Dataset):
 
     @staticmethod
     def load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
-                                eval_data_file, dev=False, evaluate=False):
+                                eval_data_file, train_config, dev=False, evaluate=False):
         # Load and cache examples for different dataset
+        train_config = train_config
         if evaluate:
             file_path = eval_data_file
         else:
@@ -77,14 +78,16 @@ class TextDataset(Dataset):
                 file_path = validation_data_file
             else:
                 file_path = train_data_file
-        return TextDataset(tokenizer, file_path=file_path)
+        return TextDataset(tokenizer, train_config, file_path=file_path)
 
-    def data_loader(self, tokenizer, dev, evaluate):
+    @classmethod
+    def data_loader(cls, tokenizer, train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
         # DataLoader
-        dataset_ = self.load_and_cache_examples(tokenizer, dev, evaluate)
+        dataset_ = cls.load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
+                                               eval_data_file, train_config, dev, evaluate)
         sampler_ = RandomSampler(dataset_)
         dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=self.train_config.batch_size
+            dataset_, sampler=sampler_, batch_size=train_config.batch_size
         )
         data_len = dataset_.__len__()
 
@@ -116,7 +119,10 @@ class Electra(object):
 
         self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
-    def train_validation(self, train_dataloader, validation_dataloader):
+    def __tokenizer_getter__(self):
+        return self.tokenizer
+
+    def train_validation(self, train_dataloader, validation_dataloader, data_len_train, data_len_validation):
         self.optimizer = self.init_optimizer(self.generator, self.discriminator, self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
 
@@ -130,13 +136,16 @@ class Electra(object):
             self.generator.train()
             self.discriminator.train()
             for idx, data in enumerate(train_dataloader):
-                loss_tr = self.train_one_step(epoch_id, idx, data)
+                loss_tr = self.train_one_step(epoch_id, idx, data, data_len_train)
                 loss_train.append(loss_tr)
 
             with torch.no_grad():
                 for idx, data in enumerate(validation_dataloader):
-                    loss_val = self.validation_one_step(epoch_id, idx, data)
+                    loss_val = self.validation_one_step(epoch_id, idx, data, data_len_validation)
                     loss_validation.append(loss_val)
+
+            torch.save(self.generator, "/content/drive/My Drive/Electra_mlm_{}.pt".format(epoch_id))
+            torch.save(self.discriminator, "/content/drive/My Drive/Electra_ce_{}.pt".format(epoch_id))
 
         return loss_train, loss_validation
 
@@ -251,28 +260,29 @@ def main():
     model_config = ElectraModelConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
-
     electra = Electra(model_config, train_config)
-    loss_train, loss_validation = electra.train_validation()
-    '''
-    optimizer_mlm_, optimizer_ce_ = init_optimizer(model_mlm=model_mlm_, model_ce=model_ce_, learning_rate=lr)
-    scheduler_mlm_, scheduler_ce_ = scheduler(optimizer_mlm=optimizer_mlm_, optimizer_ce=optimizer_ce_)
-    # , data_len = data_len_, batch_size = batch_size_)
-    loss_train_, loss_validation_ = train_validation(model_mlm=model_mlm_, model_ce=model_ce_,
-                                                     train_dataloader=train_dataloader_,
-                                                     validation_dataloader=validation_dataloader_,
-                                                     optimizer_mlm=optimizer_mlm_,
-                                                     optimizer_ce=optimizer_ce_,
-                                                     data_len_train=data_len_train_,
-                                                     data_len_validation=data_len_validation_, batch_size=batch_size_,
-                                                     epoch=epoch_, lambda_=lambda__,
-                                                     softmax_temperature=softmax_temperature_,
-                                                     scheduler_mlm=scheduler_mlm_, scheduler_ce=scheduler_ce_)
-    # scheduler_mlm = scheduler_mlm_, scheduler_ce = scheduler_ce_,
-    Electra.plot_loss(loss_train_, loss_validation_)
 
-    '''
+    tokenizer = electra.__tokenizer_getter__()
+
+    train_data_loader, train_data_len = TextDataset.data_loader(tokenizer=tokenizer, train_config=train_config,
+                                                                train_data_file=train_data_file,
+                                                                validation_data_file=validation_data_file,
+                                                                eval_data_file=eval_data_file,
+                                                                dev=False, evaluate=False)
+    valid_data_loader, valid_data_len = TextDataset.data_loader(tokenizer=tokenizer, train_config=train_config,
+                                                                train_data_file=train_data_file,
+                                                                validation_data_file=validation_data_file,
+                                                                eval_data_file=eval_data_file,
+                                                                dev=True, evaluate=False)
+
+    loss_train, loss_validation = electra.train_validation(train_dataloader=train_data_loader,
+                                                           validation_dataloader=valid_data_loader,
+                                                           data_len_train=train_data_len,
+                                                           data_len_validation=valid_data_len)
+
+    electra.plot_loss(loss_train=loss_train, loss_validation=loss_validation)
 
 
 if __name__ == "__main__":
     main()
+

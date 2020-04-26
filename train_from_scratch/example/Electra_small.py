@@ -286,3 +286,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
+# TODO: CHANGE ELECTRA GENERATOR'S INPUT(MASK) AND DISCRIMINATOR'S INPUT

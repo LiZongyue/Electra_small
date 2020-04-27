@@ -9,8 +9,7 @@ Train a small Electra from scratch and fine tune it with GLUE.
 Before running the pre-training example, you should get a file that contains text on which the language model will be trained. A good example of such text is the [WikiText-2 dataset](https://blog.einstein.ai/the-wikitext-long-term-dependency-language-modeling-dataset/). Download WikiText.raw for the example.  
 
 
-## Fine Tune the trained Electra_small with GLUE  
-run_glue.py: Fine-tuning on GLUE tasks for sequence classification  
+## Fine Tune the trained Electra_small on GLUE tasks for sequence classification  
 The General Language Understanding Evaluation (GLUE) benchmark is a collection of nine sentence- or sentence-pair language understanding tasks for evaluating and analyzing natural language understanding systems.  
 
 Before running any of these GLUE tasks you should download the [GLUE DATA](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) and unpack it to a directory.

@@ -194,7 +194,7 @@ class ElectraRunner(object):
         return scheduler
 
     def process_model(self, data):
-        mask_label = torch.rand(self.train_config.batch_size, len(data[0])) > 0.85
+        mask_label = torch.rand(data.size()[0], len(data[0])) > 0.85
         # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
         label_generator = copy.deepcopy(data)
         label_generator[~mask_label] = -100

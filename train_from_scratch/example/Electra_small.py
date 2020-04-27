@@ -1,16 +1,15 @@
 """
 Electra Small
 """
-
+import copy
 import os
-import sys
 import math
 import torch
 import pickle
 import matplotlib.pyplot as plt
 from torch import nn
 from tkinter import _flatten
-from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
+from ELectra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
     get_linear_schedule_with_warmup, AdamW
@@ -116,7 +115,7 @@ class ElectraRunner(object):
         self.optimizer = None
         self.scheduler = None
 
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
+        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
     def __tokenizer_getter__(self):
         return self.tokenizer
@@ -125,8 +124,8 @@ class ElectraRunner(object):
         self.optimizer = self.init_optimizer(self.generator, self.discriminator, self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
 
-        self.generator.to(self.device)
-        self.discriminator.to(self.device)
+#        self.generator.to(self.device)
+#        self.discriminator.to(self.device)
 
         loss_train = []
         loss_validation = []
@@ -154,16 +153,8 @@ class ElectraRunner(object):
         self.generator.train()
         self.discriminator.train()
 
-        data = data.to(self.device)
-        outputs_generator = self.generator(data, masked_lm_labels=data)
-        loss_generator = outputs_generator[:1][0]
-
-        labels_discriminator, input_discriminator = self.soft_max(data, outputs_generator,
-                                                                  self.train_config.softmax_temperature)
-        outputs_discriminator = self.discriminator(input_discriminator, labels=labels_discriminator)
-        loss_discriminator = outputs_discriminator[:1][0]
-
-        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+        # data = data.to(self.device)
+        loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
               f'Train Loss: {loss:.4f}')
@@ -178,28 +169,19 @@ class ElectraRunner(object):
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
         self.generator.eval()
         self.discriminator.eval()
-        data = data.to(self.device)
-
-        outputs_generator = self.generator(data, masked_lm_labels=data)
-        loss_generator = outputs_generator[:1][0]
-
-        labels_discriminator, input_discriminator = self.soft_max(data, outputs_generator,
-                                                                  self.train_config.softmax_temperature)
-        outputs_discriminator = self.discriminator(input_discriminator, labels=labels_discriminator)
-        loss_discriminator = outputs_discriminator[:1][0]
-        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+        # data = data.to(self.device)
+        loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
               f'Validation Loss: {loss:.4f}')
         return loss.item()
 
-    @staticmethod
-    def soft_max(input_data, output_data, softmax_temperature):
+    def soft_max(self, output_data):
         m = nn.Softmax(dim=1)
         output_softmax = torch.distributions.Categorical(
-            m(output_data[1] / softmax_temperature)).sample()  # get output_IDs of model_mlm by applyng sampling.
-        labels_ce = 1 - torch.eq(input_data, output_softmax).int()
-        return labels_ce, output_softmax
+            m(output_data[1] / self.train_config.softmax_temperature)).sample()  # get output_IDs of model_mlm by applyng sampling.
+        # labels_ce = 1 - torch.eq(input_data, output_softmax).int()
+        return output_softmax
 
     def scheduler_electra(self, optimizer):  # , data_len, batch_size):
         scheduler = get_linear_schedule_with_warmup(
@@ -207,6 +189,31 @@ class ElectraRunner(object):
             num_training_steps=self.train_config.num_training_steps
         )
         return scheduler
+
+    def process_model(self, data):
+        mask_label = torch.rand(self.train_config.batch_size, len(data[0])) > 0.85
+        label_generator = copy.deepcopy(data)
+        label_generator[~mask_label] = -100
+
+        score_generator = self.generator(data, masked_lm_labels=label_generator)
+        loss_generator = score_generator[:1][0]
+
+        output_generator = self.soft_max(score_generator)
+
+        input_discriminator = torch.zeros_like(data)
+        input_discriminator[mask_label] = output_generator[mask_label]
+        input_discriminator[~mask_label] = data[~mask_label]
+
+        labels_discriminator = torch.zeros_like(data)
+        labels_discriminator[~mask_label] = 0
+        labels_discriminator[mask_label] = (1 - torch.eq(data[mask_label], output_generator[mask_label]).int()).long()
+
+        outputs_discriminator = self.discriminator(input_discriminator, labels=labels_discriminator)
+        loss_discriminator = outputs_discriminator[:1][0]
+
+        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+
+        return loss
 
     @staticmethod
     def init_optimizer(model1, model2, learning_rate):
@@ -250,7 +257,7 @@ def main():
 
     train_config = {
         "gpu_id": 0,  # gpu
-        "learning_rate": 1e-5,
+        "learning_rate": 1e-3,
         "warmup_steps": 10,
         "n_epochs": 50,
         "batch_size": 8,
@@ -286,6 +293,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-    
-# TODO: CHANGE ELECTRA GENERATOR'S INPUT(MASK) AND DISCRIMINATOR'S INPUT

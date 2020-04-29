@@ -143,9 +143,9 @@ class ElectraRunner(object):
                     loss_validation.append(loss_val)
 
             torch.save(self.generator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                       "/Electra_mlm_{}.pt".format(epoch_id))
+                                       "/Generator{}.pt".format(epoch_id))
             torch.save(self.discriminator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                           "/Electra_ce_{}.pt".format(epoch_id))
+                                           "/Discriminator{}.pt".format(epoch_id))
             # TODO: Change the directory more generally.
 
         return loss_train, loss_validation

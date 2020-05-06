@@ -1,5 +1,8 @@
 # Electra_small
 Train a small Electra from scratch and fine tune it with GLUE.
+# Table of Contents  
+- [Train Electra from Scratch](#train-electra-from-scratch)  
+- [Fine Tune the trained Electra_small on GLUE tasks for sequence classification](#fine-tune-the-trained-electra_small-on-glue-tasks-for-sequence-classification)  
 ## Install   
 
         $ pip install -r requirements.txt
@@ -12,4 +15,6 @@ Before running the pre-training example, you should get a file that contains tex
 ## Fine Tune the trained Electra_small on GLUE tasks for sequence classification  
 The General Language Understanding Evaluation (GLUE) benchmark is a collection of nine sentence- or sentence-pair language understanding tasks for evaluating and analyzing natural language understanding systems.  
 
-Before running any of these GLUE tasks you should download the [GLUE DATA](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) and unpack it to a directory.
+
+
+For more detail about the [dataset](https://gluebenchmark.com/tasks) and how to run the example, click [here](https://github.com/LiZongyue/Electra_small/blob/master/fine-tune_GLUE/README.md)

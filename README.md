@@ -1,6 +1,6 @@
 # Electra_small
 Train a small Electra from scratch and fine tune it with GLUE.
-# Table of Contents  
+## Table of Contents  
 - [Train Electra from Scratch](#train-electra-from-scratch)  
 - [Fine Tune the trained Electra_small on GLUE tasks for sequence classification](#fine-tune-the-trained-electra_small-on-glue-tasks-for-sequence-classification)  
 ## Install   

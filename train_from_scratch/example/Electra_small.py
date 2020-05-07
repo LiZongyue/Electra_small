@@ -142,10 +142,10 @@ class ElectraRunner(object):
                     loss_val = self.validation_one_step(epoch_id, idx, data, data_len_validation)
                     loss_validation.append(loss_val)
 
-            torch.save(self.generator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                       "/Generator{}.pt".format(epoch_id))
-            torch.save(self.discriminator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                           "/Discriminator{}.pt".format(epoch_id))
+            torch.save(self.generator.cpu().state_dict(), "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
+                                       "/Generator{}.p".format(epoch_id))
+            torch.save(self.discriminator.cpu().state_dict(), "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
+                                           "/Discriminator{}.p".format(epoch_id))
             # TODO: Change the directory more generally.
 
         return loss_train, loss_validation
@@ -254,7 +254,7 @@ def main():
     # TODO: Change the strings to a dictionary and pack them into a config object.
 
     model_config = {
-        "embedding_size": 64,
+        "embedding_size": 128,
         "hidden_size_mlm": 64,
         "hidden_size_ce": 128,
         "num_hidden_layers_mlm": 3,

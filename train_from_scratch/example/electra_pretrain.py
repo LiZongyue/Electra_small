@@ -9,7 +9,7 @@ import pickle
 import matplotlib.pyplot as plt
 from torch import nn
 from tkinter import _flatten
-from ELectra_small.configs import ElectraModelConfig, ElectraTrainConfig
+from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
     get_linear_schedule_with_warmup, AdamW

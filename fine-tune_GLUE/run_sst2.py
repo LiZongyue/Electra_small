@@ -4,8 +4,8 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from ELectra_small.modeling import ElectraForClassification
-from ELectra_small.configs import ElectraTrainConfig
+from Electra_small.modeling import ElectraForClassification
+from Electra_small.configs import ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from transformers import ElectraConfig, ElectraTokenizer, ElectraForMaskedLM, get_linear_schedule_with_warmup, AdamW
 
@@ -175,7 +175,7 @@ def main():
     eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/test.tsv"
 
     model_config = {
-        "embedding_size": 64,
+        "embedding_size": 128,
         "hidden_size": 128,
         "num_hidden_layers": 6,
         "intermediate_size": 512,

@@ -20,43 +20,14 @@ class TextDataset(Dataset):
     Subclass DataSet
     """
 
-    def __init__(self, tokenizer, train_config, file_path: str, block_size=512):
-        self.train_config = train_config
-
+    def __init__(self, tokenizer, file_path: str, block_size=512):
         assert os.path.isfile(file_path)
 
-        block_size = block_size - (tokenizer.max_len - tokenizer.max_len_single_sentence)
-
-        directory, filename = os.path.split(file_path)
-        cached_features_file = os.path.join(
-            directory, "electra" + "_cached_lm_" + str(block_size) + "_" + filename
-        )
-
-        self.examples = []
         with open(file_path, encoding="utf-8") as f:
-            text = f.read()
-        # Open the file. Could be train data file, validation data file and evaluation data file
+            lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
 
-        text_line = text.split('\n')
-        # Read the data line by line, then tokenize sentences and convert them to ids one by one
-
-        tokenized_text_ = []
-        for line in text_line:
-            temp = tokenizer.tokenize(line)
-            tokenized_text_.append(tokenizer.convert_tokens_to_ids(temp))
-
-        tokenized_text = list(_flatten(tokenized_text_))
-        # flatten the list to 1d array
-
-        for i in range(0, len(tokenized_text) - block_size + 1, block_size):  # Truncate in block of block_size
-            self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[i: i + block_size]))
-
-        # Note that we are loosing the last truncated example here for the sake of simplicity (no padding)
-        # If your dataset is small, first you should look for a bigger one :-) and second you
-        # can change this behavior by adding (model specific) padding.
-
-        with open(cached_features_file, "wb") as handle:
-            pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size)
+        self.examples = batch_encoding["input_ids"]
 
     def __len__(self):
         return len(self.examples)
@@ -66,9 +37,8 @@ class TextDataset(Dataset):
 
     @staticmethod
     def load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
-                                eval_data_file, train_config, dev=False, evaluate=False):
+                                eval_data_file, dev=False, evaluate=False):
         # Load and cache examples for different dataset
-        train_config = train_config
         if evaluate:
             file_path = eval_data_file
         else:
@@ -76,13 +46,13 @@ class TextDataset(Dataset):
                 file_path = validation_data_file
             else:
                 file_path = train_data_file
-        return TextDataset(tokenizer, train_config, file_path=file_path)
+        return TextDataset(tokenizer, file_path=file_path)
 
     @classmethod
     def data_loader(cls, tokenizer, train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
         # DataLoader
         dataset_ = cls.load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
-                                               eval_data_file, train_config, dev, evaluate)
+                                               eval_data_file, dev, evaluate)
         sampler_ = RandomSampler(dataset_)
         dataloader = DataLoader(
             dataset_, sampler=sampler_, batch_size=train_config.batch_size
@@ -142,11 +112,11 @@ class ElectraRunner(object):
                     loss_val = self.validation_one_step(epoch_id, idx, data, data_len_validation)
                     loss_validation.append(loss_val)
 
-            torch.save(self.generator.cpu().state_dict(), "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                       "/Generator{}.p".format(epoch_id))
-            torch.save(self.discriminator.cpu().state_dict(), "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
-                                           "/Discriminator{}.p".format(epoch_id))
-            # TODO: Change the directory more generally.
+            torch.save(self.generator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
+                                       "/Generator_{}.pt".format(epoch_id))
+            torch.save(self.discriminator, "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/output"
+                                           "/Discriminator{}.pt".format(epoch_id))
+            # TODO: Change the directory more generally and change the save method.
 
         return loss_train, loss_validation
 
@@ -255,9 +225,9 @@ def main():
 
     model_config = {
         "embedding_size": 128,
-        "hidden_size_mlm": 64,
+        "hidden_size_mlm": 32,
         "hidden_size_ce": 128,
-        "num_hidden_layers_mlm": 3,
+        "num_hidden_layers_mlm": 6,
         "num_hidden_layers_ce": 6,
         "intermediate_size_mlm": 256,
         "intermediate_size_ce": 512,

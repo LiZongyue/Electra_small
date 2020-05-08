@@ -5,4 +5,4 @@ Before running any of these GLUE tasks you should download the [GLUE DATA](https
 
 ## Run example:
 
-    --python run_sst2.py
+    $python run_sst2.py

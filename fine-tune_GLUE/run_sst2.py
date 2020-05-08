@@ -1,8 +1,6 @@
-import torch
-from torch import nn
 import os
 import math
-import pickle
+import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,18 +15,19 @@ class TextDataset(Dataset):
     Subclass DataSet
     """
 
-    def __init__(self, tokenizer, file_path: str, block_size=128):
+    def __init__(self, tokenizer, file_path: str, block_size=64):
         assert os.path.isfile(file_path)
 
         train_data = pd.read_csv(file_path, sep='\t')
         lines = train_data['sentence'].tolist()
         # Open the file. Could be train data file, validation data file and evaluation data file
 
-        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size)
+        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
+                                                     pad_to_max_length=True)
 
         self.examples = []
         self.examples = batch_encoding["input_ids"]
-        self.labels = np.array(train_data['label'].tolist()).reshape(-1, 1).tolist()
+        self.labels = np.array(train_data['label'].tolist())
 
     def __len__(self):
         return len(self.examples)
@@ -72,7 +71,8 @@ class SST2Runner(object):
         self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
         self.electraforclassification = ElectraForClassification(model_config)
-        self.electraforclassification.load_electra_weights("/Users/cpius/Downloads/electra_state_dict.p")
+        self.electraforclassification.load_electra_weights("C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small"
+                                                           "/output/electra_state_dict.p")
         # TODO: change the data file
 
         self.optimizer = None
@@ -162,18 +162,24 @@ class SST2Runner(object):
 
         return optimizer
 
+    @staticmethod
+    def plot_loss(loss_train, loss_validation):
+        plt.plot(loss_train)
+        plt.plot(loss_validation)
+        plt.show()
+
 
 def main():
-    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.train.raw"
-    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.valid.raw"
-    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.test.raw"
+    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/train.tsv"
+    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/dev.tsv"
+    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/test.tsv"
 
     model_config = {
-        "embedding_size": 128,
+        "embedding_size": 64,
         "hidden_size": 128,
         "num_hidden_layers": 6,
         "intermediate_size": 512,
-        "num_labels": 3,
+        "num_labels": 2,
     }
 
     train_config = {
@@ -207,6 +213,8 @@ def main():
                                                         validation_dataloader=valid_data_loader,
                                                         data_len_train=train_data_len,
                                                         data_len_validation=valid_data_len)
+
+    sst2.plot_loss(loss_train=loss_train, loss_validation=loss_validation)
 
 
 if __name__ == '__main__':

@@ -5,10 +5,8 @@ import copy
 import os
 import math
 import torch
-import pickle
 import matplotlib.pyplot as plt
 from torch import nn
-from tkinter import _flatten
 from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
@@ -26,7 +24,8 @@ class TextDataset(Dataset):
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
 
-        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size)
+        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
+                                                    pad_to_max_length=True)
         self.examples = batch_encoding["input_ids"]
 
     def __len__(self):

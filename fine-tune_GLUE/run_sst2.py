@@ -4,10 +4,11 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from torch.nn.utils.rnn import pad_sequence
 from Electra_small.modeling import ElectraForClassification
 from Electra_small.configs import ElectraTrainConfig
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
-from transformers import ElectraConfig, ElectraTokenizer, ElectraForMaskedLM, get_linear_schedule_with_warmup, AdamW
+from torch.utils.data import DataLoader, Dataset, RandomSampler
+from transformers import ElectraConfig, ElectraTokenizer, get_linear_schedule_with_warmup, AdamW
 
 
 class TextDataset(Dataset):
@@ -23,8 +24,7 @@ class TextDataset(Dataset):
         # Open the file. Could be train data file, validation data file and evaluation data file
 
         batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
-                                                     pad_to_max_length=True)
-
+                                                     pad_to_max_length=False)
         self.examples = []
         self.examples = batch_encoding["input_ids"]
         self.labels = np.array(train_data['label'].tolist())
@@ -36,7 +36,7 @@ class TextDataset(Dataset):
         return torch.tensor(self.examples[index], dtype=torch.long), torch.tensor(self.labels[index], dtype=torch.long)
 
     @staticmethod
-    def load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
+    def load_and_cache_examples( tokenizer, train_data_file, validation_data_file,
                                 eval_data_file, dev=False, evaluate=False):
         # Load and cache examples for different dataset
         if evaluate:
@@ -53,13 +53,24 @@ class TextDataset(Dataset):
         # DataLoader
         dataset_ = cls.load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
                                                eval_data_file, dev, evaluate)
-        sampler_ = RandomSampler(dataset_)
+        sampler_ = RandomSampler(dataset_) # if specified, shuffle must be false
         dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=train_config.batch_size
+            dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=cls.collate_fn
         )
+        # TODO: Should shuffle=True be assigned when the Dataset is validation/evaluation? Why? Check it.
         data_len = dataset_.__len__()
 
         return dataloader, data_len
+
+    @staticmethod
+    def collate_fn(batch):
+        x, y = zip(*batch)
+        x_padded = pad_sequence(x, batch_first=True)
+        y_padded = []
+        for item in y:
+            y_padded.append(item.long())
+        y_padded = torch.tensor(y_padded)
+        return [x_padded, y_padded]
 
 
 class SST2Runner(object):
@@ -72,13 +83,13 @@ class SST2Runner(object):
 
         self.electraforclassification = ElectraForClassification(model_config)
         self.electraforclassification.load_electra_weights("C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small"
-                                                           "/output/electra_state_dict.p")
+                                                           "-master/train_from_scratch/output/electra_state_dict.p")
         # TODO: change the data file
 
         self.optimizer = None
         self.scheduler = None
 
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
+        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
     def __tokenizer_getter__(self):
         return self.tokenizer
@@ -87,7 +98,7 @@ class SST2Runner(object):
         self.optimizer = self.init_optimizer(self.electraforclassification, self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
 
-        self.electraforclassification.to(self.device)
+        # self.electraforclassification.to(self.device)
 
         loss_train = []
         loss_validation = []
@@ -109,7 +120,7 @@ class SST2Runner(object):
     def train_one_step(self, epoch_id, idx, data, data_len_train):
         self.electraforclassification.train()
 
-        data = data.to(self.device)
+        # data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
@@ -124,7 +135,7 @@ class SST2Runner(object):
 
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
         self.electraforclassification.eval()
-        data = data.to(self.device)
+        # data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
@@ -170,12 +181,15 @@ class SST2Runner(object):
 
 
 def main():
-    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/train.tsv"
-    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/dev.tsv"
-    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/glue_data/SST-2/test.tsv"
+    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data" \
+                      "/glue_data/SST-2/train.tsv "
+    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data" \
+                           "/glue_data/SST-2/dev.tsv "
+    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data/glue_data" \
+                     "/SST-2/test.tsv "
 
     model_config = {
-        "embedding_size": 128,
+        "embedding_size": 64,
         "hidden_size": 128,
         "num_hidden_layers": 6,
         "intermediate_size": 512,

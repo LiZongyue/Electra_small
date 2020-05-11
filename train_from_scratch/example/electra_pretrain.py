@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
-from ELectra_small.configs import ElectraModelConfig, ElectraTrainConfig
+from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
     get_linear_schedule_with_warmup, AdamW
@@ -26,7 +26,8 @@ class TextDataset(Dataset):
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
 
-        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size)
+        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
+                                                     pad_to_max_length=True)
         self.examples = batch_encoding["input_ids"]
 
     def __len__(self):
@@ -55,7 +56,7 @@ class TextDataset(Dataset):
                                                eval_data_file, dev, evaluate)
         sampler_ = RandomSampler(dataset_)
         dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=cls.collate_fn
+            dataset_, sampler=sampler_, batch_size=train_config.batch_size#, collate_fn=cls.collate_fn
         )
         data_len = dataset_.__len__()
 
@@ -63,13 +64,9 @@ class TextDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        x, y = zip(*batch)
-        x_padded = pad_sequence(x, batch_first=True)
-        y_padded = []
-        for item in y:
-            y_padded.append(item.long())
-        y_padded = torch.tensor(y_padded)
-        return [x_padded, y_padded]
+        x_padded = pad_sequence(batch, batch_first=True)
+
+        return x_padded
 
 
 class ElectraRunner(object):
@@ -201,7 +198,7 @@ class ElectraRunner(object):
 
     @staticmethod
     def init_optimizer(model1, model2, learning_rate):
-        #  Initialize Optimizer AdamW
+        # Initialize Optimizer AdamW
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
@@ -225,9 +222,9 @@ class ElectraRunner(object):
 
 
 def main():
-    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.train.raw"
-    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.valid.raw"
-    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small/Data/wiki.test.raw"
+    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.train.raw"
+    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.valid.raw"
+    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw"
 
     # TODO: Change the strings to a dictionary and pack them into a config object.
 

@@ -20,7 +20,7 @@ class TextDataset(Dataset):
     Subclass DataSet
     """
 
-    def __init__(self,  file_path: str):
+    def __init__(self, file_path: str):
         assert os.path.isfile(file_path)
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
@@ -33,45 +33,45 @@ class TextDataset(Dataset):
     def __getitem__(self, item):
         return self.examples[item]
 
-    @staticmethod
-    def load_and_cache_examples(train_data_file, validation_data_file,
-                                eval_data_file, dev=False, evaluate=False):
-        # Load and cache examples for different dataset
-        if evaluate:
-            file_path = eval_data_file
+
+tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
+
+
+def load_and_cache_examples(train_data_file, validation_data_file,
+                            eval_data_file, dev=False, evaluate=False):
+    # Load and cache examples for different dataset
+    if evaluate:
+        file_path = eval_data_file
+    else:
+        if dev:
+            file_path = validation_data_file
         else:
-            if dev:
-                file_path = validation_data_file
-            else:
-                file_path = train_data_file
-        return TextDataset(file_path=file_path)
+            file_path = train_data_file
+    return TextDataset(file_path=file_path)
 
-    @classmethod
-    def data_loader(cls, train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
-        # DataLoader
-        dataset_ = cls.load_and_cache_examples(train_data_file, validation_data_file,
-                                               eval_data_file, dev, evaluate)
-        sampler_ = RandomSampler(dataset_)
-        dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=cls.collate_fn, num_workers=4
-        )
-        data_len = dataset_.__len__()
 
-        return dataloader, data_len
+def data_loader(train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
+    # DataLoader
+    dataset_ = load_and_cache_examples(train_data_file, validation_data_file, eval_data_file, dev, evaluate)
+    sampler_ = RandomSampler(dataset_)
+    dataloader = DataLoader(
+        dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=collate_func, num_workers=4
+    )
+    data_len = dataset_.__len__()
 
-    @staticmethod
-    def collate_fn(batch):
+    return dataloader, data_len
 
-        tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
-        batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=240)
-        batch_debug = batch_encoding['input_ids']
-        x = []
-        for item in batch_debug:
-            x.append(torch.tensor(item, dtype=torch.long))
 
-        x_padded = pad_sequence(x, batch_first=True)
+def collate_func(batch):
+    batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=240)
+    batch_flag = batch_encoding['input_ids']
+    x = []
+    for item in batch_flag:
+        x.append(torch.tensor(item, dtype=torch.long))
 
-        return x_padded
+    x_padded = pad_sequence(x, batch_first=True)
+
+    return x_padded
 
 
 class ElectraRunner(object):
@@ -253,16 +253,16 @@ def main():
 
     electra = ElectraRunner(model_config, train_config)
 
-    train_data_loader, train_data_len = TextDataset.data_loader(train_config=train_config,
-                                                                train_data_file=train_data_file,
-                                                                validation_data_file=validation_data_file,
-                                                                eval_data_file=eval_data_file,
-                                                                dev=False, evaluate=False)
-    valid_data_loader, valid_data_len = TextDataset.data_loader(train_config=train_config,
-                                                                train_data_file=train_data_file,
-                                                                validation_data_file=validation_data_file,
-                                                                eval_data_file=eval_data_file,
-                                                                dev=True, evaluate=False)
+    train_data_loader, train_data_len = data_loader(train_config=train_config,
+                                                    train_data_file=train_data_file,
+                                                    validation_data_file=validation_data_file,
+                                                    eval_data_file=eval_data_file,
+                                                    dev=False, evaluate=False)
+    valid_data_loader, valid_data_len = data_loader(train_config=train_config,
+                                                    train_data_file=train_data_file,
+                                                    validation_data_file=validation_data_file,
+                                                    eval_data_file=eval_data_file,
+                                                    dev=True, evaluate=False)
 
     loss_train, loss_validation = electra.train_validation(train_dataloader=train_data_loader,
                                                            validation_dataloader=valid_data_loader,

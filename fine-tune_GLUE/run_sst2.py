@@ -82,8 +82,8 @@ class SST2Runner(object):
         self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
         self.electraforclassification = ElectraForClassification(model_config)
-        self.electraforclassification.load_electra_weights("C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small"
-                                                           "-master/train_from_scratch/output/electra_state_dict.p")
+        self.electraforclassification.load_electra_weights("C:/Users/Zongyue Li/Documents/Github/BNP/output"
+                                                           "/electra_state_dict.p")
         # TODO: change the data file
 
         self.optimizer = None
@@ -181,11 +181,11 @@ class SST2Runner(object):
 
 
 def main():
-    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data" \
+    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data" \
                       "/glue_data/SST-2/train.tsv "
-    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data" \
+    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data" \
                            "/glue_data/SST-2/dev.tsv "
-    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small-master/train_from_scratch/Data/glue_data" \
+    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/glue_data" \
                      "/SST-2/test.tsv "
 
     model_config = {

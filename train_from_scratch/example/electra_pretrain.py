@@ -92,7 +92,7 @@ class ElectraRunner(object):
         self.optimizer = None
         self.scheduler = None
 
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
+        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
     def __tokenizer_getter__(self):
         return self.tokenizer
@@ -101,8 +101,8 @@ class ElectraRunner(object):
         self.optimizer = self.init_optimizer(self.generator, self.discriminator, self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
 
-        self.generator.to(self.device)
-        self.discriminator.to(self.device)
+        #self.generator.to(self.device)
+        #self.discriminator.to(self.device)
 
         loss_train = []
         loss_validation = []
@@ -129,7 +129,7 @@ class ElectraRunner(object):
         self.generator.train()
         self.discriminator.train()
 
-        data = data.to(self.device)
+        #data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
@@ -145,7 +145,7 @@ class ElectraRunner(object):
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
         self.generator.eval()
         self.discriminator.eval()
-        data = data.to(self.device)
+        #data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '

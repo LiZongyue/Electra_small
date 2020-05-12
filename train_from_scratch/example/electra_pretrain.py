@@ -20,24 +20,21 @@ class TextDataset(Dataset):
     Subclass DataSet
     """
 
-    def __init__(self, tokenizer, file_path: str, block_size=512):
+    def __init__(self,  file_path: str):
         assert os.path.isfile(file_path)
-
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
 
-        batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
-                                                     pad_to_max_length=True)
-        self.examples = batch_encoding["input_ids"]
+        self.examples = lines
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, item):
-        return torch.tensor(self.examples[item], dtype=torch.long)
+        return self.examples[item]
 
     @staticmethod
-    def load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
+    def load_and_cache_examples(train_data_file, validation_data_file,
                                 eval_data_file, dev=False, evaluate=False):
         # Load and cache examples for different dataset
         if evaluate:
@@ -47,16 +44,16 @@ class TextDataset(Dataset):
                 file_path = validation_data_file
             else:
                 file_path = train_data_file
-        return TextDataset(tokenizer, file_path=file_path)
+        return TextDataset(file_path=file_path)
 
     @classmethod
-    def data_loader(cls, tokenizer, train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
+    def data_loader(cls, train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
         # DataLoader
-        dataset_ = cls.load_and_cache_examples(tokenizer, train_data_file, validation_data_file,
+        dataset_ = cls.load_and_cache_examples(train_data_file, validation_data_file,
                                                eval_data_file, dev, evaluate)
         sampler_ = RandomSampler(dataset_)
         dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=train_config.batch_size#, collate_fn=cls.collate_fn
+            dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=cls.collate_fn, num_workers=4
         )
         data_len = dataset_.__len__()
 
@@ -64,7 +61,15 @@ class TextDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        x_padded = pad_sequence(batch, batch_first=True)
+
+        tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
+        batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=240)
+        batch_debug = batch_encoding['input_ids']
+        x = []
+        for item in batch_debug:
+            x.append(torch.tensor(item, dtype=torch.long))
+
+        x_padded = pad_sequence(x, batch_first=True)
 
         return x_padded
 
@@ -74,8 +79,6 @@ class ElectraRunner(object):
     def __init__(self, model_config, train_config):
         self.model_config = model_config
         self.train_config = train_config
-
-        self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
         self.config_generator = ElectraConfig(embedding_size=model_config.embedding_size,
                                               hidden_size=model_config.hidden_size_mlm,
@@ -94,15 +97,12 @@ class ElectraRunner(object):
 
         # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
-    def __tokenizer_getter__(self):
-        return self.tokenizer
-
     def train_validation(self, train_dataloader, validation_dataloader, data_len_train, data_len_validation):
         self.optimizer = self.init_optimizer(self.generator, self.discriminator, self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
 
-        #self.generator.to(self.device)
-        #self.discriminator.to(self.device)
+        # self.generator.to(self.device)
+        # self.discriminator.to(self.device)
 
         loss_train = []
         loss_validation = []
@@ -129,7 +129,7 @@ class ElectraRunner(object):
         self.generator.train()
         self.discriminator.train()
 
-        #data = data.to(self.device)
+        # data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
@@ -145,7 +145,7 @@ class ElectraRunner(object):
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
         self.generator.eval()
         self.discriminator.eval()
-        #data = data.to(self.device)
+        # data = data.to(self.device)
         loss = self.process_model(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
@@ -253,14 +253,12 @@ def main():
 
     electra = ElectraRunner(model_config, train_config)
 
-    tokenizer = electra.__tokenizer_getter__()
-
-    train_data_loader, train_data_len = TextDataset.data_loader(tokenizer=tokenizer, train_config=train_config,
+    train_data_loader, train_data_len = TextDataset.data_loader(train_config=train_config,
                                                                 train_data_file=train_data_file,
                                                                 validation_data_file=validation_data_file,
                                                                 eval_data_file=eval_data_file,
                                                                 dev=False, evaluate=False)
-    valid_data_loader, valid_data_len = TextDataset.data_loader(tokenizer=tokenizer, train_config=train_config,
+    valid_data_loader, valid_data_len = TextDataset.data_loader(train_config=train_config,
                                                                 train_data_file=train_data_file,
                                                                 validation_data_file=validation_data_file,
                                                                 eval_data_file=eval_data_file,

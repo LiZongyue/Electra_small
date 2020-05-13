@@ -5,6 +5,7 @@ import copy
 import os
 import math
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 
 from torch import nn
@@ -13,6 +14,8 @@ from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
     get_linear_schedule_with_warmup, AdamW
+
+tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')  # global variable
 
 
 class TextDataset(Dataset):
@@ -32,9 +35,6 @@ class TextDataset(Dataset):
 
     def __getitem__(self, item):
         return self.examples[item]
-
-
-tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
 
 def load_and_cache_examples(train_data_file, validation_data_file,
@@ -65,18 +65,24 @@ def data_loader(train_config, train_data_file, validation_data_file, eval_data_f
 def collate_func(batch):
     batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=240)
     batch_flag = batch_encoding['input_ids']
+
+    mask_labels = []
     x = []
     for item in batch_flag:
         x.append(torch.tensor(item, dtype=torch.long))
+        mask_labels.append((torch.rand(len(item)) > 0.85).long())
 
     x_padded = pad_sequence(x, batch_first=True)
+    mask_labels_padded = pad_sequence(mask_labels, batch_first=True)
+    return [x_padded, mask_labels_padded]
 
-    return x_padded
 
-
-class ElectraRunner(object):
+class Electra(nn.Module):
+    _generator_: ElectraForMaskedLM
+    _discriminator_: ElectraForPreTraining
 
     def __init__(self, model_config, train_config):
+        super().__init__()
         self.model_config = model_config
         self.train_config = train_config
 
@@ -89,27 +95,86 @@ class ElectraRunner(object):
                                                   num_hidden_layers=model_config.num_hidden_layers_ce,
                                                   intermediate_size=model_config.intermediate_size_ce)
 
-        self.generator = ElectraForMaskedLM(self.config_generator)
-        self.discriminator = ElectraForPreTraining(self.config_discriminator)
+        self._generator_ = ElectraForMaskedLM(self.config_generator)
+        self._discriminator_ = ElectraForPreTraining(self.config_discriminator)
 
-        self.optimizer = None
-        self.scheduler = None
+        self._tie_embedding()
 
         # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
+    def _tie_embedding(self):
+        self._discriminator_.electra.embeddings.word_embeddings.weight = \
+            self._generator_.electra.embeddings.word_embeddings.weight
+        self._discriminator_.electra.embeddings.position_embeddings.weight = \
+            self._generator_.electra.embeddings.position_embeddings.weight
+        self._discriminator_.electra.embeddings.token_type_embeddings.weight = \
+            self._generator_.electra.embeddings.token_type_embeddings.weight
+
+    def discriminator_getter(self):
+        return self._discriminator_
+
+    def generator_getter(self):
+        return self._generator_
+
+    def forward(self, data: torch.tensor):
+        # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
+        x, mask_labels = data
+        data_generator = copy.deepcopy(x)
+        data_generator[mask_labels] = 103
+        label_generator = copy.deepcopy(x)
+        label_generator[~mask_labels] = -100
+
+        attention_mask = data_generator != 0
+
+        score_generator = self._generator_(data_generator, masked_lm_labels=label_generator)
+        loss_generator = score_generator[:1][0]
+        output_generator = self.soft_max(score_generator)
+        # Get the Softmax result for next step.
+        input_discriminator = torch.zeros_like(x)
+
+        input_discriminator[mask_labels] = output_generator[mask_labels]  # Part A
+        input_discriminator[~mask_labels] = x[~mask_labels]  # Part B
+        # Input of the Discriminator will be replaced tokens (PartA) and non-replaced tokens (PartB)
+        labels_discriminator = torch.zeros_like(x)
+        labels_discriminator[~mask_labels] = 0
+        labels_discriminator[mask_labels] = (1 - torch.eq(x[mask_labels], output_generator[mask_labels]).int()).long()
+        # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
+        outputs_discriminator = self._discriminator_(input_discriminator, labels=labels_discriminator)
+        loss_discriminator = outputs_discriminator[:1][0]
+
+        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+
+        return loss
+
+    def soft_max(self, output_data):
+        m = nn.Softmax(dim=1)
+        output_softmax = torch.distributions.Categorical(
+            m(output_data[1] / self.train_config.softmax_temperature)).sample()
+        # get output_IDs of model_mlm by applyng sampling.
+        return output_softmax
+
+
+class Runner(object):
+
+    def __init__(self, electra, train_config):
+        self.electra_small = electra
+        self.train_config = train_config
+        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
+        self.optimizer = None
+        self.scheduler = None
+
     def train_validation(self, train_dataloader, validation_dataloader, data_len_train, data_len_validation):
-        self.optimizer = self.init_optimizer(self.generator, self.discriminator, self.train_config.learning_rate)
+
+        # self.electra_small.to(self.device)
+        self.optimizer = self.init_optimizer(self.electra_small.generator_getter(),
+                                             self.electra_small.discriminator_getter(),
+                                             learning_rate=self.train_config.learning_rate)
         self.scheduler = self.scheduler_electra(self.optimizer)
-
-        # self.generator.to(self.device)
-        # self.discriminator.to(self.device)
-
         loss_train = []
         loss_validation = []
         for epoch_id in range(self.train_config.n_epochs):
             # Train
-            self.generator.train()
-            self.discriminator.train()
+            self.electra_small.train()
             for idx, data in enumerate(train_dataloader):
                 loss_tr = self.train_one_step(epoch_id, idx, data, data_len_train)
                 loss_train.append(loss_tr)
@@ -119,18 +184,18 @@ class ElectraRunner(object):
                     loss_val = self.validation_one_step(epoch_id, idx, data, data_len_validation)
                     loss_validation.append(loss_val)
 
-            torch.save(self.discriminator.cpu().state_dict(), "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small"
-                                                              "/output/Discriminator{}.p".format(epoch_id))
+            torch.save(self.electra_small.discriminator_getter().cpu().state_dict(),
+                       "C:/Users/Zongyue Li/Documents/Github/BNP/Electra_small"
+                       "/output/Discriminator{}.p".format(epoch_id + 1))
             # TODO: Change the directory more generally and change the save method.
 
         return loss_train, loss_validation
 
     def train_one_step(self, epoch_id, idx, data, data_len_train):
-        self.generator.train()
-        self.discriminator.train()
+        self.electra_small.train()
 
         # data = data.to(self.device)
-        loss = self.process_model(data)
+        loss = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
               f'Train Loss: {loss:.4f}')
@@ -143,21 +208,13 @@ class ElectraRunner(object):
         return loss.item()
 
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
-        self.generator.eval()
-        self.discriminator.eval()
+        self.electra_small.eval()
         # data = data.to(self.device)
-        loss = self.process_model(data)
+        loss = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
               f'Validation Loss: {loss:.4f}')
         return loss.item()
-
-    def soft_max(self, output_data):
-        m = nn.Softmax(dim=1)
-        output_softmax = torch.distributions.Categorical(
-            m(output_data[1] / self.train_config.softmax_temperature)).sample()
-        # get output_IDs of model_mlm by applyng sampling.
-        return output_softmax
 
     # TODO: Use Negative Sampling to optimize the training speed.
 
@@ -167,34 +224,6 @@ class ElectraRunner(object):
             num_training_steps=self.train_config.num_training_steps
         )
         return scheduler
-
-    def process_model(self, data):
-        mask_label = torch.rand(data.size()[0], len(data[0])) > 0.85
-        # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
-        label_generator = copy.deepcopy(data)
-        label_generator[~mask_label] = -100
-        # Mask tokens who won't be replaced during training. -100 will be assigned to the masked tokens, whose loss will
-        # not be calculated. The rest 15% tokens will not be changed.
-        score_generator = self.generator(data, masked_lm_labels=label_generator)
-        # TODO: The score_generator will be different if the masked_lm_labels parameter is default as None. Check out.
-        loss_generator = score_generator[:1][0]
-        output_generator = self.soft_max(score_generator)
-        # Get the Softmax result for next step.
-        input_discriminator = torch.zeros_like(data)
-
-        input_discriminator[mask_label] = output_generator[mask_label]  # Part A
-        input_discriminator[~mask_label] = data[~mask_label]  # Part B
-        # Input of the Discriminator will be replaced tokens (PartA) and non-replaced tokens (PartB)
-        labels_discriminator = torch.zeros_like(data)
-        labels_discriminator[~mask_label] = 0
-        labels_discriminator[mask_label] = (1 - torch.eq(data[mask_label], output_generator[mask_label]).int()).long()
-        # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
-        outputs_discriminator = self.discriminator(input_discriminator, labels=labels_discriminator)
-        loss_discriminator = outputs_discriminator[:1][0]
-
-        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
-
-        return loss
 
     @staticmethod
     def init_optimizer(model1, model2, learning_rate):
@@ -219,6 +248,34 @@ class ElectraRunner(object):
         plt.plot(loss_train)
         plt.plot(loss_validation)
         plt.show()
+
+
+'''
+    def process_model(self, data):
+        data_generator, label_generator, mask_label = data
+        # Mask tokens who won't be replaced during training. -100 will be assigned to the masked tokens, whose loss will
+        # not be calculated. The rest 15% tokens will not be changed.
+        score_generator = self.generator(data_generator, masked_lm_labels=label_generator)
+        # TODO: The score_generator will be different if the masked_lm_labels parameter is default as None. Check out.
+        loss_generator = score_generator[:1][0]
+        output_generator = self.soft_max(score_generator)
+        # Get the Softmax result for next step.
+        input_discriminator = torch.zeros_like(data)
+
+        input_discriminator[mask_label] = output_generator[mask_label]  # Part A
+        input_discriminator[~mask_label] = data[~mask_label]  # Part B
+        # Input of the Discriminator will be replaced tokens (PartA) and non-replaced tokens (PartB)
+        labels_discriminator = torch.zeros_like(data)
+        labels_discriminator[~mask_label] = 0
+        labels_discriminator[mask_label] = (1 - torch.eq(data[mask_label], output_generator[mask_label]).int()).long()
+        # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
+        outputs_discriminator = self.discriminator(input_discriminator, labels=labels_discriminator)
+        loss_discriminator = outputs_discriminator[:1][0]
+
+        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+
+        return loss
+'''
 
 
 def main():
@@ -251,7 +308,7 @@ def main():
     model_config = ElectraModelConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
-    electra = ElectraRunner(model_config, train_config)
+    electra_small = Electra(model_config, train_config)
 
     train_data_loader, train_data_len = data_loader(train_config=train_config,
                                                     train_data_file=train_data_file,
@@ -264,12 +321,14 @@ def main():
                                                     eval_data_file=eval_data_file,
                                                     dev=True, evaluate=False)
 
-    loss_train, loss_validation = electra.train_validation(train_dataloader=train_data_loader,
-                                                           validation_dataloader=valid_data_loader,
-                                                           data_len_train=train_data_len,
-                                                           data_len_validation=valid_data_len)
+    runner = Runner(electra_small, train_config)
 
-    electra.plot_loss(loss_train=loss_train, loss_validation=loss_validation)
+    loss_train, loss_validation = runner.train_validation(train_dataloader=train_data_loader,
+                                                          validation_dataloader=valid_data_loader,
+                                                          data_len_train=train_data_len,
+                                                          data_len_validation=valid_data_len)
+
+    runner.plot_loss(loss_train=loss_train, loss_validation=loss_validation)
 
 
 if __name__ == "__main__":

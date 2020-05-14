@@ -24,6 +24,7 @@ class TextDataset(Dataset):
     """
 
     def __init__(self, file_path: str):
+        super().__init__()
         assert os.path.isfile(file_path)
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
@@ -100,7 +101,7 @@ class Electra(nn.Module):
 
         self._tie_embedding()
 
-        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
+        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
     def _tie_embedding(self):
         self._discriminator_.electra.embeddings.word_embeddings.weight = \
@@ -119,14 +120,21 @@ class Electra(nn.Module):
     def forward(self, data: torch.tensor):
         # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
         x, mask_labels = data
+        mask_labels = mask_labels.bool()
+        # x = x.to(self.device)
+        # mask_labels = mask_labels.to(self.device)
         data_generator = copy.deepcopy(x)
         data_generator[mask_labels] = 103
         label_generator = copy.deepcopy(x)
         label_generator[~mask_labels] = -100
-
         attention_mask = data_generator != 0
 
-        score_generator = self._generator_(data_generator, masked_lm_labels=label_generator)
+        # data_generator = data_generator.to(self.device)
+        # label_generator = label_generator.to(self.device)
+        # attention_mask = attention_mask.to(self.device)
+
+        score_generator = self._generator_(data_generator, attention_mask, masked_lm_labels=label_generator)
+        # TODO: ablations here. attention_mask is assigned.
         loss_generator = score_generator[:1][0]
         output_generator = self.soft_max(score_generator)
         # Get the Softmax result for next step.
@@ -139,7 +147,8 @@ class Electra(nn.Module):
         labels_discriminator[~mask_labels] = 0
         labels_discriminator[mask_labels] = (1 - torch.eq(x[mask_labels], output_generator[mask_labels]).int()).long()
         # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
-        outputs_discriminator = self._discriminator_(input_discriminator, labels=labels_discriminator)
+        outputs_discriminator = self._discriminator_(input_discriminator, attention_mask, labels=labels_discriminator)
+        # TODO: ablations here. attention_mask is assigned.
         loss_discriminator = outputs_discriminator[:1][0]
 
         loss = loss_generator + self.train_config.lambda_ * loss_discriminator
@@ -194,7 +203,6 @@ class Runner(object):
     def train_one_step(self, epoch_id, idx, data, data_len_train):
         self.electra_small.train()
 
-        # data = data.to(self.device)
         loss = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
@@ -209,7 +217,7 @@ class Runner(object):
 
     def validation_one_step(self, epoch_id, idx, data, data_len_validation):
         self.electra_small.eval()
-        # data = data.to(self.device)
+
         loss = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
               f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
@@ -333,3 +341,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Note: on 2020/5/13, without attention mask, loss decreased extremely quickly to around 1~2 (original version). After
+# 1 epoch, loss will be ~20.
+# TODO: Ablations

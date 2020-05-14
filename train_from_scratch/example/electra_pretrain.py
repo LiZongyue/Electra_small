@@ -28,8 +28,9 @@ class TextDataset(Dataset):
         assert os.path.isfile(file_path)
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
+        res_lines = [item for item in lines if not(item.startswith(' ='))]
 
-        self.examples = lines
+        self.examples = res_lines
 
     def __len__(self):
         return len(self.examples)
@@ -64,7 +65,7 @@ def data_loader(train_config, train_data_file, validation_data_file, eval_data_f
 
 
 def collate_func(batch):
-    batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=240)
+    batch_encoding = tokenizer.batch_encode_plus(batch, add_special_tokens=True, max_length=128)
     batch_flag = batch_encoding['input_ids']
 
     mask_labels = []
@@ -90,11 +91,13 @@ class Electra(nn.Module):
         self.config_generator = ElectraConfig(embedding_size=model_config.embedding_size,
                                               hidden_size=model_config.hidden_size_mlm,
                                               num_hidden_layers=model_config.num_hidden_layers_mlm,
-                                              intermediate_size=model_config.intermediate_size_mlm)
+                                              intermediate_size=model_config.intermediate_size_mlm,
+                                              num_attention_heads=model_config.attention_heads_mlm)
         self.config_discriminator = ElectraConfig(embedding_size=model_config.embedding_size,
                                                   hidden_size=model_config.hidden_size_ce,
                                                   num_hidden_layers=model_config.num_hidden_layers_ce,
-                                                  intermediate_size=model_config.intermediate_size_ce)
+                                                  intermediate_size=model_config.intermediate_size_ce,
+                                                  num_attention_heads=model_config.attention_heads_ce)
 
         self._generator_ = ElectraForMaskedLM(self.config_generator)
         self._discriminator_ = ElectraForPreTraining(self.config_discriminator)
@@ -241,11 +244,11 @@ class Runner(object):
             {
                 "params": [p for n, p in model1.named_parameters() if not any(nd in n for nd in no_decay)] +
                           [p for n, p in model2.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
+                "weight_decay": 0.01,
             },
             {"params": [p for n, p in model1.named_parameters() if any(nd in n for nd in no_decay)] +
                        [p for n, p in model2.named_parameters() if any(nd in n for nd in no_decay)],
-             "weight_decay": 0.0},
+             "weight_decay": 0.01},
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
 
@@ -295,20 +298,22 @@ def main():
 
     model_config = {
         "embedding_size": 128,
-        "hidden_size_mlm": 32,
-        "hidden_size_ce": 128,
-        "num_hidden_layers_mlm": 6,
-        "num_hidden_layers_ce": 6,
+        "hidden_size_mlm": 64,
+        "hidden_size_ce": 256,
+        "num_hidden_layers_mlm": 12,
+        "num_hidden_layers_ce": 12,
         "intermediate_size_mlm": 256,
-        "intermediate_size_ce": 512,
+        "intermediate_size_ce": 1024,
+        "attention_heads_mlm": 1,
+        "attention_heads_ce": 4,
     }
 
     train_config = {
         "gpu_id": 0,  # gpu
-        "learning_rate": 1e-3,
-        "warmup_steps": 10,
+        "learning_rate": 5e-4,
+        "warmup_steps": 10000,
         "n_epochs": 50,
-        "batch_size": 8,
+        "batch_size": 128,
         "softmax_temperature": 1,
         "lambda_": 50,
     }

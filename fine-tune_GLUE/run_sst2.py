@@ -154,7 +154,7 @@ class SST2Runner(object):
     def process_model(self, data):
         example_input, example_labels = data
         example_input = example_input.to(self.device)
-        example_labels = example_labels.to(self.device)
+        example_labels = example_labels.to(self.device).float()
         # example_input = torch.randint(0, 30522, (3, 10)).long(),  input shape (bs, seq_len)
         # example_labels = # torch.randint(0, 3, (3,)).long()  # labels shape (bs, )
         scores = self.electraforclassification(example_input)  # output scores/logits shape (bs, num_labels)

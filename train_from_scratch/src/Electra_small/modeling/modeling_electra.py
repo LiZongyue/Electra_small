@@ -8,13 +8,14 @@ class ElectraForClassification(ElectraPreTrainedModel):
     """
     Electra for downstream task -- sentence-level classification
     """
+
     def __init__(self, config):
         super().__init__(config)
 
-        self.electra    = ElectraModel(config)
-        self.dropout    = nn.Dropout(config.hidden_dropout_prob)
+        self.electra = ElectraModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.loss_fn    = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
                 inputs_embeds=None):
@@ -28,12 +29,15 @@ class ElectraForClassification(ElectraPreTrainedModel):
         :param inputs_embeds:
         :return: predicted logits scores with shape (batch_size, 1)
         """
-
-        discriminator_hidden_states   = self.electra(input_ids, attention_mask, token_type_ids, position_ids, head_mask, inputs_embeds)
-        discriminator_cls_output = discriminator_hidden_states[0][:, 0]   # load the hidden states of [CLS] token
+        if attention_mask is None:
+            attention_mask = input_ids != 0
+        discriminator_hidden_states = self.electra(input_ids, attention_mask, token_type_ids, position_ids, head_mask,
+                                                   inputs_embeds)
+        discriminator_cls_output = discriminator_hidden_states[0][:, 0]  # load the hidden states of [CLS] token
         discriminator_cls_output = self.dropout(discriminator_cls_output)
 
         logits = self.classifier(discriminator_cls_output)
+
         return logits
 
     def get_loss(self, scores, labels):
@@ -44,6 +48,5 @@ class ElectraForClassification(ElectraPreTrainedModel):
         loss = self.loss_fn(scores, labels)
         return loss
 
-    def load_electra_weights(self, path):
-        state_dict = torch.load(path)
+    def load_electra_weights(self, state_dict):
         self.electra.load_state_dict(state_dict)

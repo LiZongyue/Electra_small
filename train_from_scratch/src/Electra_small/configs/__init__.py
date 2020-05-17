@@ -1,2 +1,2 @@
 # config for Electra
-from .config_electra import ElectraModelConfig, ElectraTrainConfig
+from .config_electra import ElectraFileConfig, ElectraModelConfig, ElectraTrainConfig

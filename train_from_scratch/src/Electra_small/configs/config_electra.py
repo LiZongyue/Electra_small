@@ -4,6 +4,16 @@ File for all classed of configs for electra
 from .config_utils import BaseConfig
 
 
+class ElectraFileConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.train_data_file = kwargs.pop("train_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki"
+                                                             ".train.raw")
+        self.validation_data_file = kwargs.pop("validation_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data"
+                                                                       "/wiki.valid.raw")
+        self.eval_data_file = kwargs.pop("eval_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw")
+
+
 class ElectraModelConfig(BaseConfig):
     def __init__(self, **kwargs):
         super().__init__()
@@ -25,7 +35,7 @@ class ElectraTrainConfig(BaseConfig):
         self.learning_rate = kwargs.pop("learning_rate", 1e-4)
         self.warmup_steps = kwargs.pop("warmup_steps", 10000)
         self.n_epochs = kwargs.pop("n_epochs", 110)
-        self.batch_size = kwargs.pop("batch_size", 128)
+        self.batch_size_train = kwargs.pop("batch_size_train", 128)
+        self.batch_size_val = kwargs.pop("batch_size_val", 4)
         self.softmax_temperature = kwargs.pop("softmax_temperature", 1)
         self.lambda_ = kwargs.pop("lambda_", 50)
-        self.num_training_steps = kwargs.pop("num_training_steps", 9900000)

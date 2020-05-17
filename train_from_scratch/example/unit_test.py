@@ -5,12 +5,12 @@ import copy
 import os
 import math
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 
-from apex import amp
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
-from Electra_small.configs import ElectraFileConfig, ElectraModelConfig, ElectraTrainConfig
+from Electra_small.configs import ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM, \
     get_linear_schedule_with_warmup, AdamW
@@ -28,7 +28,7 @@ class TextDataset(Dataset):
         assert os.path.isfile(file_path)
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
-        res_lines = [item for item in lines if not (item.startswith(' ='))]
+        res_lines = [item for item in lines if not(item.startswith(' ='))]
 
         self.examples = res_lines
 
@@ -42,7 +42,6 @@ class TextDataset(Dataset):
 def load_and_cache_examples(train_data_file, validation_data_file,
                             eval_data_file, dev=False, evaluate=False):
     # Load and cache examples for different dataset
-    flag_train = False
     if evaluate:
         file_path = eval_data_file
     else:
@@ -50,23 +49,16 @@ def load_and_cache_examples(train_data_file, validation_data_file,
             file_path = validation_data_file
         else:
             file_path = train_data_file
-            flag_train = True
-    return TextDataset(file_path=file_path), flag_train
+    return TextDataset(file_path=file_path)
 
 
-def data_loader(file_config, train_config, dev, evaluate):
+def data_loader(train_config, train_data_file, validation_data_file, eval_data_file, dev, evaluate):
     # DataLoader
-    dataset_, flag_train = load_and_cache_examples(file_config.train_data_file, file_config.validation_data_file,
-                                                   file_config.eval_data_file, dev, evaluate)
+    dataset_ = load_and_cache_examples(train_data_file, validation_data_file, eval_data_file, dev, evaluate)
     sampler_ = RandomSampler(dataset_)
-    if flag_train:
-        dataloader = DataLoader(
-            dataset_, sampler=sampler_, batch_size=train_config.batch_size_train, collate_fn=collate_func, num_workers=4
-        )
-    else:
-        dataloader = DataLoader(
-            dataset_, shuffle=False, batch_size=train_config.batch_size_val, collate_fn=collate_func, num_workers=4
-        )
+    dataloader = DataLoader(
+        dataset_, sampler=sampler_, batch_size=train_config.batch_size, collate_fn=collate_func, num_workers=4
+    )
     data_len = dataset_.__len__()
 
     return dataloader, data_len
@@ -96,22 +88,12 @@ class Electra(nn.Module):
         self.model_config = model_config
         self.train_config = train_config
 
-        self.config_generator = ElectraConfig(embedding_size=model_config.embedding_size,
-                                              hidden_size=model_config.hidden_size_mlm,
-                                              num_hidden_layers=model_config.num_hidden_layers_mlm,
-                                              intermediate_size=model_config.intermediate_size_mlm,
-                                              num_attention_heads=model_config.attention_heads_mlm)
-        self.config_discriminator = ElectraConfig(embedding_size=model_config.embedding_size,
-                                                  hidden_size=model_config.hidden_size_ce,
-                                                  num_hidden_layers=model_config.num_hidden_layers_ce,
-                                                  intermediate_size=model_config.intermediate_size_ce,
-                                                  num_attention_heads=model_config.attention_heads_ce)
+        self._generator_ = ElectraForMaskedLM.from_pretrained('google/electra-small-generator')
+        self._discriminator_ = ElectraForPreTraining.from_pretrained('google/electra-small-discriminator')
 
-        self._generator_ = ElectraForMaskedLM(self.config_generator)
-        self._discriminator_ = ElectraForPreTraining(self.config_discriminator)
+        # self._tie_embedding()
 
-        self._tie_embedding()
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id)) if torch.cuda.is_available() else 'cpu'
+        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
 
     def _tie_embedding(self):
         self._discriminator_.electra.embeddings.word_embeddings.weight = \
@@ -131,17 +113,17 @@ class Electra(nn.Module):
         # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
         x, mask_labels = data
         mask_labels = mask_labels.bool()
-        x = x.to(self.device)
-        mask_labels = mask_labels.to(self.device)
+        # x = x.to(self.device)
+        # mask_labels = mask_labels.to(self.device)
         data_generator = copy.deepcopy(x)
         data_generator[mask_labels] = 103
         label_generator = copy.deepcopy(x)
         label_generator[~mask_labels] = -100
         attention_mask = data_generator != 0
 
-        data_generator = data_generator.to(self.device)
-        label_generator = label_generator.to(self.device)
-        attention_mask = attention_mask.to(self.device)
+        # data_generator = data_generator.to(self.device)
+        # label_generator = label_generator.to(self.device)
+        # attention_mask = attention_mask.to(self.device)
 
         score_generator = self._generator_(data_generator, attention_mask, masked_lm_labels=label_generator)
         # TODO: ablations here. attention_mask is assigned.
@@ -163,7 +145,7 @@ class Electra(nn.Module):
 
         loss = loss_generator + self.train_config.lambda_ * loss_discriminator
 
-        return loss
+        return loss, loss_discriminator, loss_generator
 
     def soft_max(self, output_data):
         m = nn.Softmax(dim=1)
@@ -178,27 +160,22 @@ class Runner(object):
     def __init__(self, electra, train_config):
         self.electra_small = electra
         self.train_config = train_config
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id)) if torch.cuda.is_available() else 'cpu'
+        # self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id))
         self.optimizer = None
         self.scheduler = None
 
     def train_validation(self, train_dataloader, validation_dataloader, data_len_train, data_len_validation):
 
-        self.electra_small.to(self.device)
-        self.optimizer = self.init_optimizer(self.electra_small.generator_getter(),
-                                             self.electra_small.discriminator_getter(),
-                                             learning_rate=self.train_config.learning_rate)
-
-        if torch.cuda.is_available():
-            self.electra_small, self.optimizer = amp.initialize(self.electra_small, self.optimizer, opt_level="O1",
-                                                                verbosity=0)
-        self.scheduler = self.scheduler_electra(self.optimizer, data_len=data_len_train)
+        # self.electra_small.to(self.device)
+        # self.optimizer = self.init_optimizer(self.electra_small.generator_getter(),
+        #                                    self.electra_small.discriminator_getter(),
+        #                                    learning_rate=self.train_config.learning_rate)
+        # self.scheduler = self.scheduler_electra(self.optimizer)
         loss_train = []
         loss_validation = []
         for epoch_id in range(self.train_config.n_epochs):
             # Train
             self.electra_small.train()
-
             for idx, data in enumerate(train_dataloader):
                 loss_tr = self.train_one_step(epoch_id, idx, data, data_len_train)
                 loss_train.append(loss_tr)
@@ -218,20 +195,17 @@ class Runner(object):
     def train_one_step(self, epoch_id, idx, data, data_len_train):
         self.electra_small.train()
 
-        loss = self.electra_small(data)
+        loss, loss_d, loss_g = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
-              f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size_train)} | '
-              f'Train Loss: {loss:.4f}')
+              f'batch: {idx + 1} / {math.ceil(data_len_train / self.train_config.batch_size)} | '
+              f'Train Loss: {loss:.4f} | '
+              f'Train Loss_g: {loss_g:.4f} |'
+              f'Train Loss_d: {loss_d:.4f}')
         # Autograd
-        self.optimizer.zero_grad()
-        if torch.cuda.is_available():
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
-        self.optimizer.step()
-        if self.scheduler is not None:
-            self.scheduler.step()
+        # self.optimizer.zero_grad()
+        # loss.backward()
+        # self.optimizer.step()
+        # self.scheduler.step()
 
         return loss.item()
 
@@ -240,15 +214,16 @@ class Runner(object):
 
         loss = self.electra_small(data)
         print(f'Epoch: {epoch_id + 1} | '
-              f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size_val)} | '
+              f'batch: {idx + 1} / {math.ceil(data_len_validation / self.train_config.batch_size)} | '
               f'Validation Loss: {loss:.4f}')
         return loss.item()
 
-    def scheduler_electra(self, optimizer, data_len):
-        num_training_steps = int(data_len / self.train_config.batch_size_train * self.train_config.n_epochs)
+    # TODO: Use Negative Sampling to optimize the training speed.
+
+    def scheduler_electra(self, optimizer):  # , data_len, batch_size):
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.train_config.warmup_steps,
-            num_training_steps=num_training_steps
+            num_training_steps=self.train_config.num_training_steps
         )
         return scheduler
 
@@ -277,7 +252,7 @@ class Runner(object):
         plt.show()
 
 
-'''
+
     def process_model(self, data):
         data_generator, label_generator, mask_label = data
         # Mask tokens who won't be replaced during training. -100 will be assigned to the masked tokens, whose loss will
@@ -302,15 +277,15 @@ class Runner(object):
         loss = loss_generator + self.train_config.lambda_ * loss_discriminator
 
         return loss
-'''
+
 
 
 def main():
-    file_config = {
-        "train_data_file": "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.train.raw",
-        "validation_data_file": "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.valid.raw",
-        "eval_data_file": "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw",
-    }
+    train_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.train.raw"
+    validation_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.valid.raw"
+    eval_data_file = "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw"
+
+    # TODO: Change the strings to a dictionary and pack them into a config object.
 
     model_config = {
         "embedding_size": 128,
@@ -329,22 +304,26 @@ def main():
         "learning_rate": 5e-4,
         "warmup_steps": 10000,
         "n_epochs": 50,
-        "batch_size_train": 128,
-        "batch_size_val": 4,
+        "batch_size": 128,
         "softmax_temperature": 1,
         "lambda_": 50,
     }
 
-    file_config = ElectraFileConfig(**file_config)
     model_config = ElectraModelConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
     electra_small = Electra(model_config, train_config)
 
-    train_data_loader, train_data_len = data_loader(file_config=file_config, train_config=train_config, dev=False,
-                                                    evaluate=False)
-    valid_data_loader, valid_data_len = data_loader(file_config=file_config, train_config=train_config, dev=True,
-                                                    evaluate=False)
+    train_data_loader, train_data_len = data_loader(train_config=train_config,
+                                                    train_data_file=train_data_file,
+                                                    validation_data_file=validation_data_file,
+                                                    eval_data_file=eval_data_file,
+                                                    dev=False, evaluate=False)
+    valid_data_loader, valid_data_len = data_loader(train_config=train_config,
+                                                    train_data_file=train_data_file,
+                                                    validation_data_file=validation_data_file,
+                                                    eval_data_file=eval_data_file,
+                                                    dev=True, evaluate=False)
 
     runner = Runner(electra_small, train_config)
 
@@ -359,4 +338,8 @@ def main():
 if __name__ == "__main__":
     main()
 
+# Note: on 2020/5/13, without attention mask, loss decreased extremely quickly to around 1~2 (original version). After
+# 1 epoch, loss will be ~20.
 # TODO: Ablations
+
+

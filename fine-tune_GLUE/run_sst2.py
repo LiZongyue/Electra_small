@@ -32,7 +32,7 @@ def collate_func(batch):
     x_padded = pad_sequence(x, batch_first=True)
     y_padded = []
     for item in y:
-        y_padded.append(item.long())
+        y_padded.append([item.long()])
     y_padded = torch.tensor(y_padded)
     return [x_padded, y_padded]
 

@@ -5,7 +5,6 @@ Train a small Electra from scratch and fine tune it with GLUE.
 - [Fine Tune the trained Electra_small on GLUE tasks for sequence classification](#fine-tune-the-trained-electra_small-on-glue-tasks-for-sequence-classification)  
 ## Install   
 
-        $ pip install -r requirements.txt
         $ pip install .
         
 

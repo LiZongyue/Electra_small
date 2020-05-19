@@ -16,24 +16,17 @@ def data_loader(tokenizer, file_config, train_config):
     dataset_tr = TextDataset(tokenizer, file_config.train_data_file)
     dataset_val = TextDataset(tokenizer, file_config.validation_data_file)
     dataloader_tr = DataLoader(
-        dataset_tr, shuffle=True, batch_size=train_config.batch_size_train, collate_fn=collate_func, num_workers=4
+        dataset_tr, shuffle=True, batch_size=train_config.batch_size_train, collate_fn=dataset_tr.collate_func,
+        num_workers=4
     )
     dataloader_val = DataLoader(
-        dataset_val, shuffle=False, batch_size=train_config.batch_size_val, collate_fn=collate_func, num_workers=4
+        dataset_val, shuffle=False, batch_size=train_config.batch_size_val, collate_fn=dataset_val.collate_func,
+        num_workers=4
     )
     data_len_tr = dataset_tr.__len__()
     data_len_val = dataset_val.__len__()
     return dataloader_tr, dataloader_val, data_len_tr, data_len_val
 
-
-def collate_func(batch):
-    x, y = zip(*batch)
-    x_padded = pad_sequence(x, batch_first=True)
-    y_padded = []
-    for item in y:
-        y_padded.append([item.long()])
-    y_padded = torch.tensor(y_padded)
-    return [x_padded, y_padded]
 
 
 class TextDataset(Dataset):
@@ -58,6 +51,16 @@ class TextDataset(Dataset):
 
     def __getitem__(self, index):
         return torch.tensor(self.examples[index], dtype=torch.long), torch.tensor(self.labels[index], dtype=torch.long)
+
+    @staticmethod
+    def collate_func(batch):
+        x, y = zip(*batch)
+        x_padded = pad_sequence(x, batch_first=True)
+        y_padded = []
+        for item in y:
+            y_padded.append([item.long()])
+        y_padded = torch.tensor(y_padded)
+        return [x_padded, y_padded]
 
 
 class SST2Runner(object):

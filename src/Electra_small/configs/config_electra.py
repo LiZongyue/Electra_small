@@ -12,6 +12,7 @@ class ElectraFileConfig(BaseConfig):
         self.validation_data_file = kwargs.pop("validation_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data"
                                                                        "/wiki.valid.raw")
         self.eval_data_file = kwargs.pop("eval_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw")
+        self.save_path = kwargs.pop("save_path", "/Users/Jackie/Documents/GitHub/output/Discriminator{}.p")
 
 
 class ElectraModelConfig(BaseConfig):
@@ -39,3 +40,5 @@ class ElectraTrainConfig(BaseConfig):
         self.batch_size_val = kwargs.pop("batch_size_val", 4)
         self.softmax_temperature = kwargs.pop("softmax_temperature", 1)
         self.lambda_ = kwargs.pop("lambda_", 50)
+        self.add_special_tokens = kwargs.pop("lambda_", True)
+        self.max_length = kwargs.pop("max_length", 128)

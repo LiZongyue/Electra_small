@@ -1,52 +1,75 @@
+import torch.nn
+import copy
 import torch
-import torch.nn as nn
 
-from transformers.modeling_electra import ElectraModel, ElectraPreTrainedModel
+from torch import nn
+from transformers import ElectraForPreTraining, ElectraForMaskedLM
 
 
-class ElectraForClassification(ElectraPreTrainedModel):
-    """
-    Electra for downstream task -- sentence-level classification
-    """
+class Electra(nn.Module):
+    _generator_: ElectraForMaskedLM
+    _discriminator_: ElectraForPreTraining
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, model_config, train_config):
+        super().__init__()
+        self.model_config = model_config
+        self.train_config = train_config
 
-        self.electra = ElectraModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.loss_fn = nn.BCEWithLogitsLoss()
+    def _tie_embedding(self):
+        self._discriminator_.electra.embeddings.word_embeddings.weight = \
+            self._generator_.electra.embeddings.word_embeddings.weight
+        self._discriminator_.electra.embeddings.position_embeddings.weight = \
+            self._generator_.electra.embeddings.position_embeddings.weight
+        self._discriminator_.electra.embeddings.token_type_embeddings.weight = \
+            self._generator_.electra.embeddings.token_type_embeddings.weight
 
-    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
-                inputs_embeds=None):
-        """
+    def discriminator_getter(self):
+        return self._discriminator_
 
-        :param input_ids:
-        :param attention_mask:
-        :param token_type_ids:
-        :param position_ids:
-        :param head_mask:
-        :param inputs_embeds:
-        :return: predicted logits scores with shape (batch_size, 1)
-        """
-        if attention_mask is None:
-            attention_mask = input_ids != 0
-        discriminator_hidden_states = self.electra(input_ids, attention_mask, token_type_ids, position_ids, head_mask,
-                                                   inputs_embeds)
-        discriminator_cls_output = discriminator_hidden_states[0][:, 0]  # load the hidden states of [CLS] token
-        discriminator_cls_output = self.dropout(discriminator_cls_output)
+    def generator_getter(self):
+        return self._generator_
 
-        logits = self.classifier(discriminator_cls_output)
+    def forward(self, data: torch.tensor):
+        # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
+        x, mask_labels = data
+        mask_labels = mask_labels.bool()
+        x = x.to(self.device)
+        mask_labels = mask_labels.to(self.device)
+        data_generator = copy.deepcopy(x)
+        data_generator[mask_labels] = 103
+        label_generator = copy.deepcopy(x)
+        label_generator[~mask_labels] = -100
+        attention_mask = data_generator != 0
 
-        return logits
+        data_generator = data_generator.to(self.device)
+        label_generator = label_generator.to(self.device)
+        attention_mask = attention_mask.to(self.device)
 
-    def get_loss(self, scores, labels):
-        """
-        :param labels: torch.LongTensor of shape :obj: (batch_size, 1), Indices should be in ``[0, ..., config.num_labels - 1]``
-        :return:
-        """
-        loss = self.loss_fn(scores, labels)
+        score_generator = self._generator_(data_generator, attention_mask, masked_lm_labels=label_generator)
+        # TODO: ablations here. attention_mask is assigned.
+        loss_generator = score_generator[:1][0]
+        output_generator = self.soft_max(score_generator)
+        # Get the Softmax result for next step.
+        input_discriminator = torch.zeros_like(x)
+
+        input_discriminator[mask_labels] = output_generator[mask_labels]  # Part A
+        input_discriminator[~mask_labels] = x[~mask_labels]  # Part B
+        # Input of the Discriminator will be replaced tokens (PartA) and non-replaced tokens (PartB)
+        labels_discriminator = torch.zeros_like(x)
+        labels_discriminator[~mask_labels] = 0
+        labels_discriminator[mask_labels] = (1 - torch.eq(x[mask_labels], output_generator[mask_labels]).int()).long()
+        # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
+        outputs_discriminator = self._discriminator_(input_discriminator, attention_mask, labels=labels_discriminator)
+        # TODO: ablations here. attention_mask is assigned.
+        loss_discriminator = outputs_discriminator[:1][0]
+
+        loss = loss_generator + self.train_config.lambda_ * loss_discriminator
+
         return loss
 
-    def load_electra_weights(self, state_dict):
-        self.electra.load_state_dict(state_dict)
+    def soft_max(self, output_data):
+        m = nn.Softmax(dim=1)
+        output_softmax = torch.distributions.Categorical(
+            m(output_data[1] / self.train_config.softmax_temperature)).sample()
+        # get output_IDs of model_mlm by applyng sampling.
+        return output_softmax

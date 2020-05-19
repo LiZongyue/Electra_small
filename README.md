@@ -17,4 +17,4 @@ The General Language Understanding Evaluation (GLUE) benchmark is a collection o
 
 
 
-For more detail about the [dataset](https://gluebenchmark.com/tasks) and how to run the example, click [here](https://github.com/LiZongyue/Electra_small/blob/master/fine-tune_GLUE/README.md)
+For more detail about the [dataset](https://gluebenchmark.com/tasks) and how to run the example, click [here](https://github.com/LiZongyue/Electra_small/blob/master/examples/fine-tune_GLUE/README.md)

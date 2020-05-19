@@ -2,13 +2,12 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from sklearn.metrics import accuracy_score
 from torch.nn.utils.rnn import pad_sequence
 from Electra_small.modeling import ElectraForClassification
 from Electra_small.configs import ElectraFileConfig, ElectraTrainConfig
-from torch.utils.data import DataLoader, Dataset, RandomSampler
+from torch.utils.data import DataLoader, Dataset
 from transformers import ElectraConfig, ElectraTokenizer, get_linear_schedule_with_warmup, AdamW
 
 

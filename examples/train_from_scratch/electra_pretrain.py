@@ -9,7 +9,7 @@ from Electra_small.modeling import Electra
 from Electra_small.dataset import TextDataset
 from Electra_small.configs import ElectraFileConfig, ElectraModelConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader, RandomSampler
-from transformers import ElectraForPreTraining, ElectraConfig, ElectraForMaskedLM
+from transformers import ElectraForPreTraining, ElectraTokenizer, ElectraConfig, ElectraForMaskedLM
 
 
 class PreTrainDataset(TextDataset):
@@ -25,9 +25,10 @@ class PreTrainDataset(TextDataset):
         res_lines = [item for item in lines if not (item.startswith(' ='))]
 
         self.examples = res_lines
+        self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
 
-def load_and_cache_examples(train_data_file, validation_data_file,
+def load_and_cache_examples(train_config, train_data_file, validation_data_file,
                             eval_data_file, dev=False, evaluate=False):
     # Load and cache examples for different dataset
     flag_train = False
@@ -39,12 +40,12 @@ def load_and_cache_examples(train_data_file, validation_data_file,
         else:
             file_path = train_data_file
             flag_train = True
-    return PreTrainDataset(file_path=file_path), flag_train
+    return PreTrainDataset(file_path, train_config), flag_train
 
 
 def data_loader(file_config, train_config, dev, evaluate):
     # DataLoader
-    dataset_, flag_train = load_and_cache_examples(file_config.train_data_file, file_config.validation_data_file,
+    dataset_, flag_train = load_and_cache_examples(train_config, file_config.train_data_file, file_config.validation_data_file,
                                                    file_config.eval_data_file, dev, evaluate)
     sampler_ = RandomSampler(dataset_)
     if flag_train:
@@ -67,7 +68,7 @@ class ElectraSmall(Electra):
     _discriminator_: ElectraForPreTraining
 
     def __init__(self, model_config, train_config):
-        super().__init__(model_config, train_config)
+        super().__init__(train_config)
 
         self.config_generator = ElectraConfig(embedding_size=model_config.embedding_size,
                                               hidden_size=model_config.hidden_size_mlm,

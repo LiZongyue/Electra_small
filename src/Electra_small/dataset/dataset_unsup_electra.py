@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import Dataset
 from transformers import ElectraTokenizer
@@ -8,9 +9,15 @@ class TextDataset(Dataset):
     examples: []
     tokenizer: ElectraTokenizer
 
-    def __init__(self, train_config):
+    def __init__(self, file_path, train_config):
         super().__init__()
         self.train_config = train_config
+        self.file_path = file_path
+        assert os.path.isfile(file_path)
+        with open(file_path, encoding="utf-8") as f:
+            lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
+
+        self.examples = lines
 
     def __len__(self):
         return len(self.examples)

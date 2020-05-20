@@ -18,13 +18,7 @@ class PreTrainDataset(TextDataset):
     """
 
     def __init__(self, file_path: str, train_config):
-        super().__init__(train_config)
-        assert os.path.isfile(file_path)
-        with open(file_path, encoding="utf-8") as f:
-            lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
-        res_lines = [item for item in lines if not (item.startswith(' ='))]
-
-        self.examples = res_lines
+        super().__init__(file_path, train_config)
         self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
 

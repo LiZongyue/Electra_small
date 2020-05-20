@@ -1,4 +1,3 @@
-import os
 import torch
 
 from Electra_small.runner import Runner
@@ -15,12 +14,8 @@ class Pft_Dataset(TextDataset):
     """
 
     def __init__(self, file_path: str, train_config):
-        super().__init__(train_config)
-        assert os.path.isfile(file_path)
-        with open(file_path, encoding="utf-8") as f:
-            lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
+        super().__init__(file_path, train_config)
 
-        self.examples = lines
         '''
         files = os.listdir(file_path)  # get all files under the dir
         txts = []

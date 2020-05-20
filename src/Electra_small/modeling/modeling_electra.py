@@ -10,9 +10,8 @@ class Electra(nn.Module):
     _generator_: ElectraForMaskedLM
     _discriminator_: ElectraForPreTraining
 
-    def __init__(self, model_config, train_config):
+    def __init__(self, train_config):
         super().__init__()
-        self.model_config = model_config
         self.train_config = train_config
 
     def _tie_embedding(self):

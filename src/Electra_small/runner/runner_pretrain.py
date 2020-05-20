@@ -2,7 +2,7 @@ import math
 import torch
 import matplotlib.pyplot as plt
 
-from apex import amp
+# from apex import amp
 from transformers import get_linear_schedule_with_warmup, AdamW
 
 
@@ -22,9 +22,6 @@ class Runner(object):
         self.optimizer = self.init_optimizer(self.electra_small.generator_getter(),
                                              self.electra_small.discriminator_getter(),
                                              learning_rate=self.train_config.learning_rate)
-        if torch.cuda.is_available():
-            self.electra_small, self.optimizer = amp.initialize(self.electra_small, self.optimizer, opt_level="O1",
-                                                                verbosity=0)
 
         self.scheduler = self.scheduler_electra(self.optimizer, data_len=data_len_train)
         loss_train = []
@@ -56,11 +53,7 @@ class Runner(object):
               f'Train Loss: {loss:.4f}')
         # Autograd
         self.optimizer.zero_grad()
-        if torch.cuda.is_available():
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
+        loss.backward()
         self.optimizer.step()
         if self.scheduler is not None:
             self.scheduler.step()

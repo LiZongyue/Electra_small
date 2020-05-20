@@ -40,5 +40,5 @@ class ElectraTrainConfig(BaseConfig):
         self.batch_size_val = kwargs.pop("batch_size_val", 4)
         self.softmax_temperature = kwargs.pop("softmax_temperature", 1)
         self.lambda_ = kwargs.pop("lambda_", 50)
-        self.add_special_tokens = kwargs.pop("lambda_", True)
+        self.add_special_tokens = kwargs.pop("add_special_tokens", True)
         self.max_length = kwargs.pop("max_length", 128)

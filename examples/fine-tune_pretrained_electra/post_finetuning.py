@@ -1,14 +1,12 @@
 import os
 import torch
 
-from tqdm import tqdm
-from termcolor import colored
 from Electra_small.runner import Runner
 from Electra_small.modeling import Electra
 from Electra_small.dataset import TextDataset
 from torch.utils.data import DataLoader, RandomSampler
 from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraForMaskedLM
-from Electra_small.configs import ElectraFileConfig, ElectraModelConfig, ElectraTrainConfig
+from Electra_small.configs import ElectraFileConfig, ElectraTrainConfig
 
 
 class Pft_Dataset(TextDataset):
@@ -18,7 +16,12 @@ class Pft_Dataset(TextDataset):
 
     def __init__(self, file_path: str, train_config):
         super().__init__(train_config)
+        assert os.path.isfile(file_path)
+        with open(file_path, encoding="utf-8") as f:
+            lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
 
+        self.examples = lines
+        '''
         files = os.listdir(file_path)  # get all files under the dir
         txts = []
         print(colored("Pre processing the data...", "red"))
@@ -28,8 +31,18 @@ class Pft_Dataset(TextDataset):
                 data = f.read()  # read file
                 data = data.replace('<br />', '')
                 txts.append(data)
+            if tr:
+                pass
+            #    with open(file_path + '/train.txt', 'a', encoding='utf-8') as f:
+            #        f.write(data + '\n')
+            #        f.close()
+            else:
+                with open(file_path + '/val.txt', 'a', encoding='utf-8') as f:
+                    f.write(data + '\n')
+                    f.close()
 
         self.examples = txts
+        '''
         self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
 
@@ -37,7 +50,7 @@ def data_loader(file_config, train_config):
     # DataLoader
     dataset_tr = Pft_Dataset(file_config.train_data_file, train_config)
     sampler = RandomSampler(dataset_tr)
-    dataset_val = Pft_Dataset(file_config.validation_data_file)
+    dataset_val = Pft_Dataset(file_config.validation_data_file, train_config)
     dataloader_tr = DataLoader(
         dataset_tr, sampler=sampler, batch_size=train_config.batch_size_train, collate_fn=dataset_tr.collate_func,
         num_workers=4
@@ -48,13 +61,13 @@ def data_loader(file_config, train_config):
     )
     data_len_tr = dataset_tr.__len__()
     data_len_val = dataset_val.__len__()
-    return dataloader_tr, dataloader_val, data_len_val, data_len_tr
+    return dataloader_tr, dataloader_val, data_len_tr, data_len_val
 
 
 class ElectraBase(Electra):
 
-    def __init__(self, model_config, train_config):
-        super().__init__(model_config, train_config)
+    def __init__(self, train_config):
+        super().__init__(train_config)
 
         self._generator_ = ElectraForMaskedLM.from_pretrained("google/electra-small-generator")
         self._discriminator_ = ElectraForPreTraining.from_pretrained("google/electra-small-discriminator")
@@ -65,45 +78,32 @@ class ElectraBase(Electra):
 
 def main():
     file_config = {
-        "train_data_file": "/Users/Jackie/Documents/GitHub/Data/aclImdb/train/unsup",
-        "validation_data_file": None,
+        "train_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/train/train.txt",
+        "validation_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/valid/val.txt",
         "eval_data_file": None,
         "save_path": "/Users/Jackie/Documents/GitHub/output/Discriminator{}.p",
-    }
-
-    model_config = {
-        "embedding_size": 128,
-        "hidden_size_mlm": 64,
-        "hidden_size_ce": 256,
-        "num_hidden_layers_mlm": 12,
-        "num_hidden_layers_ce": 12,
-        "intermediate_size_mlm": 256,
-        "intermediate_size_ce": 1024,
-        "attention_heads_mlm": 1,
-        "attention_heads_ce": 4,
+        
     }
 
     train_config = {
         "gpu_id": 0,  # gpu
-        "learning_rate": 5e-4,
+        "learning_rate": 2e-4,
         "warmup_steps": 10000,
         "n_epochs": 50,
-        "batch_size_train": 1,
+        "batch_size_train": 256,
         "batch_size_val": 4,
         "softmax_temperature": 1,
         "lambda_": 50,
+        "max_length": 256,
     }
 
     file_config = ElectraFileConfig(**file_config)
-    model_config = ElectraModelConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
     train_data_loader, valid_data_loader, train_data_len, valid_data_len = data_loader(file_config, train_config)
-    electra_small = ElectraBase(model_config, train_config)
+    electra_small = ElectraBase(train_config)
     runner = Runner(electra_small, train_config, file_config)
 
-    valid_data_loader = None
-    valid_data_len = None
     loss_train, loss_validation = runner.train_validation(train_dataloader=train_data_loader,
                                                           validation_dataloader=valid_data_loader,
                                                           data_len_train=train_data_len,

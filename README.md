@@ -5,7 +5,9 @@ Train a small Electra from scratch and fine tune it with GLUE.
 - [Fine Tune the trained Electra_small on GLUE tasks for sequence classification](#fine-tune-the-trained-electra_small-on-glue-tasks-for-sequence-classification)  
 - [Fine Tune the pretrained Electra_base on imdb unsupervised dataset ](#fine-tune-the-pretrained-electra_base-on-imdb-unsupervised-dataset)  
 ## Install   
-
+        
+        $ git clone https://github.com/LiZongyue/Electra_small.git
+        $ cd ~/Electra_small
         $ pip install .
         
 

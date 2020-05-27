@@ -12,7 +12,8 @@ class ElectraFileConfig(BaseConfig):
         self.validation_data_file = kwargs.pop("validation_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data"
                                                                        "/wiki.valid.raw")
         self.eval_data_file = kwargs.pop("eval_data_file", "C:/Users/Zongyue Li/Documents/Github/BNP/Data/wiki.test.raw")
-        self.save_path = kwargs.pop("save_path", "/Users/Jackie/Documents/GitHub/output/Discriminator{}.p")
+        self.save_path = kwargs.pop("save_path", "C:/Users/Jackie/Documents/GitHub/output/Discriminator{}.p")
+        self.import_path = kwargs.pop("import_path", "C:/Users/Zongyue Li/Documents/Github/BNP/output/Discriminator9.p")
 
 
 class ElectraModelConfig(BaseConfig):
@@ -36,6 +37,7 @@ class ElectraTrainConfig(BaseConfig):
         self.learning_rate = kwargs.pop("learning_rate", 1e-4)
         self.warmup_steps = kwargs.pop("warmup_steps", 10000)
         self.n_epochs = kwargs.pop("n_epochs", 110)
+        self.train_head_epoch = kwargs.pop("train_head_epoch", 3)
         self.batch_size_train = kwargs.pop("batch_size_train", 128)
         self.batch_size_val = kwargs.pop("batch_size_val", 4)
         self.softmax_temperature = kwargs.pop("softmax_temperature", 1)

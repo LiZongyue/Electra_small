@@ -144,9 +144,9 @@ class FineTuningRunner(object):
             labels_train.append(label_tr.cpu().numpy())
         with torch.no_grad():
             for idx, data in enumerate(validation_dataloader):
-                label_val, loss_val, logits_val = self.validation_one_step(data)
+                label_val, loss_val, logits_validation = self.validation_one_step(data)
                 loss_validation.append(loss_val)
-                logits_val.append(logits_val.detach().cpu().numpy())
+                logits_val.append(logits_validation.detach().cpu().numpy())
                 labels_val.append(label_val.cpu().numpy())
 
         mean_loss_train = np.mean(np.array(loss_train))

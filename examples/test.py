@@ -10,3 +10,4 @@ logits = [[100, 200, 300], [0, 2, -1]]
 
 res = sigmoid(np.concatenate(logits))
 print(res)
+print("test finished")

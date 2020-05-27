@@ -149,6 +149,12 @@ class FineTuningRunner(object):
                 logits_val.append(logits_validation.detach().cpu().numpy())
                 labels_val.append(label_val.cpu().numpy())
 
+        logits_train = np.concatenate(logits_train)
+        labels_train = np.concatenate(labels_train)
+
+        logits_val = np.concatenate(logits_val)
+        labels_val = np.concatenate(labels_val)
+
         mean_loss_train = np.mean(np.array(loss_train))
         mean_loss_val = np.mean(np.array(loss_validation))
         acc_tr = accuracy_score(labels_train, (self.sigmoid(logits_train) > 0.5).astype(int))

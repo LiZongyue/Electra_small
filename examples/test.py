@@ -1,20 +1,11 @@
-
-import pandas as pd
-
-
-def main():
-
-    '''
-    obj = DataGenerator()
-    obj.data_saver("C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/pos",
-                   "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/neg")
-
-    obj.data_saver("C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/test/pos",
-                   "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/test/neg")
-    '''
-    data = pd.read_csv("C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/train_data.csv")
-    print(data.shape)
+import numpy as np
 
 
-if __name__ == "__main__":
-    main()
+def sigmoid(logits):
+    return 1 / (1 + np.exp(-logits))
+
+
+logits = [[100, 200, 300], [0, 2, -1]]
+
+res = sigmoid(np.concatenate(logits))
+print(res)

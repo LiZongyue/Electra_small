@@ -123,10 +123,16 @@ class SST2Runner(object):
             labels_train.append(label_tr.cpu().numpy())
         with torch.no_grad():
             for idx, data in enumerate(validation_dataloader):
-                label_val, loss_val, logits_val = self.validation_one_step(data)
+                label_val, loss_val, logits_validation = self.validation_one_step(data)
                 loss_validation.append(loss_val)
-                logits_val.append(logits_val.detach().cpu().numpy())
+                logits_val.append(logits_validation.detach().cpu().numpy())
                 labels_val.append(label_val.cpu().numpy())
+
+        logits_train = np.concatenate(logits_train)
+        labels_train = np.concatenate(labels_train)
+
+        logits_val = np.concatenate(logits_val)
+        labels_val = np.concatenate(labels_val)
 
         mean_loss_train = np.mean(np.array(loss_train))
         mean_loss_val = np.mean(np.array(loss_validation))

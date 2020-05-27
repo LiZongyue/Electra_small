@@ -44,3 +44,4 @@ class ElectraTrainConfig(BaseConfig):
         self.lambda_ = kwargs.pop("lambda_", 50)
         self.add_special_tokens = kwargs.pop("add_special_tokens", True)
         self.max_length = kwargs.pop("max_length", 128)
+        self.lr_decay = kwargs.pop("lr_decay", 0.8)

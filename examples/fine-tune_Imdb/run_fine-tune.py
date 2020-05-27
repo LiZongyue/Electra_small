@@ -108,7 +108,8 @@ class FineTuningRunner(object):
         # train all
         num_layers = len(self.electraforclassification.electra.encoder.layer)
         param_optimizer = list(self.electraforclassification.named_parameters())
-        optimizer_parameters = self.get_layer_wise_lr_decay(num_layers, param_optimizer, self.train_config.learning_rate)
+        optimizer_parameters = self.get_layer_wise_lr_decay(num_layers, param_optimizer,
+                                                            self.train_config.learning_rate, self.train_config.lr_decay)
         optimizer = AdamW(optimizer_parameters, lr=self.train_config.learning_rate, eps=1e-8, weight_decay=0.01)
         for epoch_id in range(self.train_config.n_epochs):
             mean_loss_train, mean_loss_val, acc_tr, acc_val = self.train_validation(train_dataloader,
@@ -250,7 +251,8 @@ def main():
         "n_epochs": 100,
         "batch_size_train": 32,
         "batch_size_val": 16,
-        "train_head_epoch": 10
+        "train_head_epoch": 10,
+        "lr_decay": 0.8,
     }
 
     file_config = ElectraFileConfig(**file_config)

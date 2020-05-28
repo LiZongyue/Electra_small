@@ -37,7 +37,7 @@ class BertRunner(object):
                     loss_val = self.validation_one_step(epoch_id, idx, data, data_len_validation)
                     loss_validation.append(loss_val)
 
-            torch.save(self.bert_base.discriminator_getter().state_dict(),
+            torch.save(self.bert_base.bert_getter().state_dict(),
                        self.file_config.save_path.format(epoch_id + 1))
 
         return loss_train, loss_validation

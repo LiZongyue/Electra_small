@@ -32,3 +32,6 @@ class BertBase(nn.Module):
 
         loss, = outputs[:1]
         return loss
+
+    def bert_getter(self):
+        return self.model

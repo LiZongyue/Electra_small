@@ -39,7 +39,7 @@ def main():
         "train_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/train.txt",
         "validation_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/val.txt",
         "eval_data_file": None,
-        "save_path": "C:/Users/Jackie/Documents/GitHub/output/Discriminator{}.p",
+        "save_path": "C:/Users/Jackie/Documents/GitHub/output/Bert{}.p",
 
     }
 

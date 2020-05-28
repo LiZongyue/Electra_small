@@ -196,7 +196,7 @@ def main():
         "train_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/train_data.csv",
         "validation_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/test/test_data.csv",
         "eval_data_file": "C:/Users/Zongyue Li/Documents/Github/BNP/Data/glue_data/SST-2/test.tsv",
-        "import_path": "bert-base-uncased",
+        "import_path": "C:/Users/Zongyue Li/Documents/Github/BNP/output/Bert1.p",
     }
 
     model_config = {

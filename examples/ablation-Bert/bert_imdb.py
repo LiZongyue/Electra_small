@@ -84,7 +84,7 @@ class FineTuningRunner:
 
     def train_validation(self, train_dataloader, validation_dataloader, train_data_len, head: bool, optimizer):
         self.optimizer = optimizer
-        self.scheduler = self.scheduler(self.optimizer, train_data_len)
+        self.scheduler = self.scheduler_bert(self.optimizer, train_data_len)
 
         if head:
             self.bert_cls.bert.required_grad = False
@@ -155,7 +155,7 @@ class FineTuningRunner:
         loss = self.bert_cls.get_loss(scores, example_labels)
         return example_labels, loss, scores
 
-    def scheduler(self, optimizer, train_data_len):  # , data_len, batch_size):
+    def scheduler_bert(self, optimizer, train_data_len):  # , data_len, batch_size):
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.train_config.warmup_steps,
             num_training_steps=int(train_data_len / self.train_config.batch_size_train * self.train_config.n_epochs)

@@ -1,44 +1,19 @@
-import torch
-
-from Electra_small.runner import Runner
-from Electra_small.modeling import Electra
+from Electra_small.runner import BertRunner
 from Electra_small.dataset import TextDataset
+from Electra_small.modeling import BertBase
 from torch.utils.data import DataLoader, RandomSampler
-from transformers import ElectraTokenizer, ElectraForPreTraining, ElectraForMaskedLM
+from transformers import BertTokenizer
 from Electra_small.configs import ElectraFileConfig, ElectraTrainConfig
 
 
 class Pft_Dataset(TextDataset):
     """
-    Subclass DataSet
+    Subclass TextDataSet
     """
 
     def __init__(self, file_path: str, train_config):
         super().__init__(file_path, train_config)
-
-        '''
-        files = os.listdir(file_path)  # get all files under the dir
-        txts = []
-        print(colored("Pre processing the data...", "red"))
-        for file in tqdm(files):  # iterate the dir
-            position = file_path + '/' + file  # construct path with "/"
-            with open(position, "r", encoding='utf-8') as f:  # open file
-                data = f.read()  # read file
-                data = data.replace('<br />', '')
-                txts.append(data)
-            if tr:
-                pass
-            #    with open(file_path + '/train.txt', 'a', encoding='utf-8') as f:
-            #        f.write(data + '\n')
-            #        f.close()
-            else:
-                with open(file_path + '/val.txt', 'a', encoding='utf-8') as f:
-                    f.write(data + '\n')
-                    f.close()
-
-        self.examples = txts
-        '''
-        self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 
 def data_loader(file_config, train_config):
@@ -59,25 +34,13 @@ def data_loader(file_config, train_config):
     return dataloader_tr, dataloader_val, data_len_tr, data_len_val
 
 
-class ElectraBase(Electra):
-
-    def __init__(self, train_config):
-        super().__init__(train_config)
-
-        self._generator_ = ElectraForMaskedLM.from_pretrained("google/electra-small-generator")
-        self._discriminator_ = ElectraForPreTraining.from_pretrained("google/electra-small-discriminator")
-
-        self._tie_embedding()
-        self.device = torch.device('cuda:{}'.format(self.train_config.gpu_id)) if torch.cuda.is_available() else 'cpu'
-
-
 def main():
     file_config = {
         "train_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/train.txt",
         "validation_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/unsup/val.txt",
         "eval_data_file": None,
         "save_path": "C:/Users/Jackie/Documents/GitHub/output/Discriminator{}.p",
-        
+
     }
 
     train_config = {
@@ -87,8 +50,6 @@ def main():
         "n_epochs": 50,
         "batch_size_train": 32,
         "batch_size_val": 16,
-        "softmax_temperature": 1,
-        "lambda_": 50,
         "max_length": 128,
     }
 
@@ -96,8 +57,8 @@ def main():
     train_config = ElectraTrainConfig(**train_config)
 
     train_data_loader, valid_data_loader, train_data_len, valid_data_len = data_loader(file_config, train_config)
-    electra_small = ElectraBase(train_config)
-    runner = Runner(electra_small, train_config, file_config)
+    bert_base = BertBase(train_config)
+    runner = BertRunner(bert_base, train_config, file_config)
 
     loss_train, loss_validation = runner.train_validation(train_dataloader=train_data_loader,
                                                           validation_dataloader=valid_data_loader,

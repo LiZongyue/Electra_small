@@ -3,10 +3,11 @@ import numpy as np
 
 from sklearn.metrics import accuracy_score
 from Electra_small.dataset import SupTextDataset
-from Electra_small.modeling import ElectraForClassification
+from Electra_small.modeling import BertForClassification
 from Electra_small.configs import ElectraFileConfig, ElectraTrainConfig
 from torch.utils.data import DataLoader
-from transformers import ElectraConfig, ElectraTokenizer, get_linear_schedule_with_warmup, AdamW
+from transformers import ElectraConfig, get_linear_schedule_with_warmup, AdamW
+from transformers import BertTokenizer
 
 
 def data_loader(tokenizer, file_config, train_config):
@@ -26,23 +27,23 @@ def data_loader(tokenizer, file_config, train_config):
     return dataloader_tr, dataloader_val, data_len_tr, data_len_val
 
 
-class FineTuningRunner(object):
+class FineTuningRunner:
 
     def __init__(self, model_config, train_config, file_config):
         self.model_config = model_config
         self.train_config = train_config
 
-        self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-base-discriminator')
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-        self.electraforclassification = ElectraForClassification(model_config)
+        self.bert_cls = BertForClassification(model_config)
 
         pre_trained_weights = torch.load(file_config.import_path, map_location=torch.device('cpu'))
         state_to_load = {}
         for name, param in pre_trained_weights.items():
-            if name.startswith('electra.'):
-                state_to_load[name[len('electra.'):]] = param
+            if name.startswith('bert.'):
+                state_to_load[name[len('bert.'):]] = param
 
-        self.electraforclassification.electra.load_state_dict(state_to_load)
+        self.bert_cls.load_bert_weights(state_to_load)
         self.optimizer = None
         self.scheduler = None
 
@@ -58,7 +59,7 @@ class FineTuningRunner(object):
     def run(self, train_dataloader, validation_dataloader, train_data_len):
         # train head
         for epoch_id in range(self.train_config.train_head_epoch):
-            optimizer = AdamW(list(self.electraforclassification.classifier.parameters()),
+            optimizer = AdamW(list(self.bert_cls.classifier.parameters()),
                               lr=self.train_config.learning_rate)
             mean_loss_train, mean_loss_val, acc_tr, acc_val = self.train_validation(train_dataloader,
                                                                                     validation_dataloader,
@@ -68,8 +69,8 @@ class FineTuningRunner(object):
                 f"valid_head_loss={mean_loss_val:.4f}, val_head_acc={acc_val:.4f}")
 
         # train all
-        num_layers = len(self.electraforclassification.electra.encoder.layer)
-        param_optimizer = list(self.electraforclassification.named_parameters())
+        num_layers = len(self.bert_cls.bert.encoder.layer)
+        param_optimizer = list(self.bert_cls.named_parameters())
         optimizer_parameters = self.get_layer_wise_lr_decay(num_layers, param_optimizer,
                                                             self.train_config.learning_rate, self.train_config.lr_decay)
         optimizer = AdamW(optimizer_parameters, lr=self.train_config.learning_rate, eps=1e-8, weight_decay=0.01)
@@ -83,14 +84,14 @@ class FineTuningRunner(object):
 
     def train_validation(self, train_dataloader, validation_dataloader, train_data_len, head: bool, optimizer):
         self.optimizer = optimizer
-        self.scheduler = self.scheduler_electra(self.optimizer, train_data_len)
+        self.scheduler = self.scheduler(self.optimizer, train_data_len)
 
         if head:
-            self.electraforclassification.electra.required_grad = False
+            self.bert_cls.bert.required_grad = False
         else:
-            self.electraforclassification.electra.required_grad = True
+            self.bert_cls.bert.required_grad = True
 
-        self.electraforclassification.to(self.device)
+        self.bert_cls.to(self.device)
 
         logits_train = []
         logits_val = []
@@ -99,7 +100,7 @@ class FineTuningRunner(object):
         loss_train = []
         loss_validation = []
         # Train
-        self.electraforclassification.train()
+        self.bert_cls.train()
         for idx, data in enumerate(train_dataloader):
             label_tr, loss_tr, logits_tr = self.train_one_step(data)
             loss_train.append(loss_tr)
@@ -126,7 +127,7 @@ class FineTuningRunner(object):
         return mean_loss_train, mean_loss_val, acc_tr, acc_val
 
     def train_one_step(self, data):
-        self.electraforclassification.train()
+        self.bert_cls.train()
 
         labels, loss, logits = self.process_model(data)
         # Autograd
@@ -138,7 +139,7 @@ class FineTuningRunner(object):
         return labels, loss.item(), logits
 
     def validation_one_step(self, data):
-        self.electraforclassification.eval()
+        self.bert_cls.eval()
 
         labels, loss, logits = self.process_model(data)
         return labels, loss.item(), logits
@@ -149,12 +150,12 @@ class FineTuningRunner(object):
         example_labels = example_labels.to(self.device).float()
         # example_input = torch.randint(0, 30522, (3, 10)).long(),  input shape (bs, seq_len)
         # example_labels = # torch.randint(0, 3, (3,)).long()  # labels shape (bs, )
-        scores = self.electraforclassification(example_input)  # output scores/logits shape (bs, num_labels)
+        scores = self.bert_cls(example_input)  # output scores/logits shape (bs, num_labels)
         scores = scores.to(self.device)
-        loss = self.electraforclassification.get_loss(scores, example_labels)
+        loss = self.bert_cls.get_loss(scores, example_labels)
         return example_labels, loss, scores
 
-    def scheduler_electra(self, optimizer, train_data_len):  # , data_len, batch_size):
+    def scheduler(self, optimizer, train_data_len):  # , data_len, batch_size):
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.train_config.warmup_steps,
             num_training_steps=int(train_data_len / self.train_config.batch_size_train * self.train_config.n_epochs)
@@ -169,14 +170,14 @@ class FineTuningRunner(object):
         for i in range(num_layers):
             layer_group = []
             for n, p in param_optimizer:
-                if n.startswith(f'electra.encoder.layer.{i}.'):
+                if n.startswith(f'bert.encoder.layer.{i}.'):
                     included_params_names.append(n)
                     layer_group.append(p)
             optimizer_paramters.append({'params': layer_group, 'lr': lr * lr_decay ** (num_layers - i)})
 
         embedding_group = []
         for n, p in param_optimizer:
-            if n.startswith('electra.embeddings.'):
+            if n.startswith('bert.embeddings.'):
                 included_params_names.append(n)
                 embedding_group.append(p)
         optimizer_paramters.append({'params': embedding_group, 'lr': lr * lr_decay ** (num_layers + 1)})
@@ -195,7 +196,7 @@ def main():
         "train_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/train/train_data.csv",
         "validation_data_file": "C:/Users/Zongyue Li/Documents/GitHub/BNP/Data/aclImdb/test/test_data.csv",
         "eval_data_file": "C:/Users/Zongyue Li/Documents/Github/BNP/Data/glue_data/SST-2/test.tsv",
-        "import_path": "C:/Users/Zongyue Li/Documents/Github/BNP/output/Discriminator9.p",
+        "import_path": "bert-base-uncased",
     }
 
     model_config = {

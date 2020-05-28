@@ -1,13 +1,8 @@
-import numpy as np
-import pandas as pd
+from transformers import BertForMaskedLM, ElectraForPreTraining
 
+model = BertForMaskedLM.from_pretrained("bert-base-uncased")
+electra = ElectraForPreTraining.from_pretrained('google/electra-base-discriminator')
+print(model)
+print("=====================")
+print(electra)
 
-def sigmoid(logits):
-    return 1 / (1 + np.exp(-logits))
-
-
-logits = [[100, 200, 300], [0, 2, -1]]
-
-res = sigmoid(np.concatenate(logits))
-print(res)
-print("test finished")

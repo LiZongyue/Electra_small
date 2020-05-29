@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from transformers.modeling_electra import ElectraModel, ElectraPreTrainedModel

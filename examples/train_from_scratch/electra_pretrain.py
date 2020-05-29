@@ -1,7 +1,6 @@
 """
 Electra Small
 """
-import os
 import torch
 
 from Electra_small.runner import Runner
@@ -39,8 +38,9 @@ def load_and_cache_examples(train_config, train_data_file, validation_data_file,
 
 def data_loader(file_config, train_config, dev, evaluate):
     # DataLoader
-    dataset_, flag_train = load_and_cache_examples(train_config, file_config.train_data_file, file_config.validation_data_file,
-                                                   file_config.eval_data_file, dev, evaluate)
+    dataset_, flag_train = load_and_cache_examples(train_config, file_config.train_data_file,
+                                                   file_config.validation_data_file, file_config.eval_data_file,
+                                                   dev, evaluate)
     sampler_ = RandomSampler(dataset_)
     if flag_train:
         dataloader = DataLoader(

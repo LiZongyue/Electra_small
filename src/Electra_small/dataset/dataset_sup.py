@@ -14,8 +14,10 @@ class SupTextDataset(Dataset):
 
     def __init__(self, tokenizer, file_path: str, block_size=128):
         assert os.path.isfile(file_path)
-
-        data = pd.read_csv(file_path)
+        if '.tsv' in file_path:
+            data = pd.read_csv(file_path, sep='\t')
+        else:
+            data = pd.read_csv(file_path)
 
         lines = data['sentences'].tolist()
 

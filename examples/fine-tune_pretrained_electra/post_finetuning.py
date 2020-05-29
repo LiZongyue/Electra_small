@@ -15,29 +15,6 @@ class Pft_Dataset(TextDataset):
 
     def __init__(self, file_path: str, train_config):
         super().__init__(file_path, train_config)
-
-        '''
-        files = os.listdir(file_path)  # get all files under the dir
-        txts = []
-        print(colored("Pre processing the data...", "red"))
-        for file in tqdm(files):  # iterate the dir
-            position = file_path + '/' + file  # construct path with "/"
-            with open(position, "r", encoding='utf-8') as f:  # open file
-                data = f.read()  # read file
-                data = data.replace('<br />', '')
-                txts.append(data)
-            if tr:
-                pass
-            #    with open(file_path + '/train.txt', 'a', encoding='utf-8') as f:
-            #        f.write(data + '\n')
-            #        f.close()
-            else:
-                with open(file_path + '/val.txt', 'a', encoding='utf-8') as f:
-                    f.write(data + '\n')
-                    f.close()
-
-        self.examples = txts
-        '''
         self.tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
 
 

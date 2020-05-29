@@ -3,7 +3,7 @@ from Electra_small.modeling import BertForClassification
 from Electra_small.configs import ElectraFileConfig, ElectraTrainConfig
 from Electra_small.runner import FineTuningRunner
 from torch.utils.data import DataLoader
-from transformers import ElectraConfig
+from transformers import BertConfig
 from transformers import BertTokenizer
 
 
@@ -71,7 +71,7 @@ def main():
     }
 
     file_config = ElectraFileConfig(**file_config)
-    model_config = ElectraConfig(**model_config)
+    model_config = BertConfig(**model_config)
     train_config = ElectraTrainConfig(**train_config)
 
     finetune = BertFineTuningRunner(model_config, train_config, file_config)

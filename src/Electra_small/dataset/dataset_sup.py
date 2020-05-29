@@ -18,14 +18,19 @@ class SupTextDataset(Dataset):
             data = pd.read_csv(file_path, sep='\t')
         else:
             data = pd.read_csv(file_path)
-
-        lines = data['sentences'].tolist()
+        if '.tsv' in file_path:
+            lines = data['sentence'].tolist()
+        else:
+            lines = data['sentences'].tolist()
 
         batch_encoding = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size,
                                                      pad_to_max_length=False)
         self.examples = []
         self.examples = batch_encoding["input_ids"]
-        self.labels = np.array(data['labels'].tolist())
+        if '.tsv' in file_path:
+            self.labels = np.array(data['label'].tolist())
+        else:
+            self.labels = np.array(data['labels'].tolist())
 
     def __len__(self):
         return len(self.examples)

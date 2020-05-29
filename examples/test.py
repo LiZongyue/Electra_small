@@ -1,14 +1,5 @@
-from Electra_small.modeling.modeling_electra_SST import ElectraForClassification
-from transformers import ElectraConfig
+import pandas as pd
 
-model_config = {
-    "embedding_size": 768,
-    "hidden_size": 768,
-    "num_hidden_layers": 12,
-    "intermediate_size": 3072,
-    "num_labels": 1,
-}
-model_config = ElectraConfig(**model_config)
-model = ElectraForClassification(model_config)
+data = pd.read_csv("C:/Users/Zongyue Li/Documents/Github/BNP/Data/glue_data/SST-2/train.tsv", sep='\t')
 
-print(isinstance(model, ElectraForClassification))
+print(data.head(5))

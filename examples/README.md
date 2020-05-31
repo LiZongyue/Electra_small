@@ -10,12 +10,17 @@ Post-pretrained model means that both of Bert-base-uncased and Electra-Discrimin
 
 * __Head for downstream task__  
 A same head as SST-2 task is re-used in this experiment. For next step, more different heads will be tested and documented.  
+* __Hyper-Parameters__  
+
+|    H-Params   |   model configurations   |   leraning rate   |   warmup steps   |   train head epochs   | train all epochs |batch size of training| batch size of validation|layer-wise learning rate decay|
+| :----------: | :-----------:  | :-----------: | :----------: |:-----------: | :----------: |:-----------: | :----------: | :----------: |
+|   All Models   |   same as in paper   |   3e-5   |    400    | 5 |6|32|16|0.8|
 
 * __Results__  
 
 |    Models   | Train loss after<br>training Head for 5 Epochs     | Train loss after<br>training all for 6 Epochs     | Train Accuracy after<br>training Head for 5 Epochs     | Train Accuracy after<br>training all for 6 Epochs     | Validation loss after<br>training Head for 5 Epochs     | Validation loss after<br>training all for 6 Epochs     | Validation Accuracy after<br>training Head for 5 Epochs     | Validation Accuracy after<br>training all for 6 Epochs (best)     |
-| ---------- | :-----------:  | :-----------: | ---------- | :-----------:  | :-----------: | ---------- | :-----------:  | :-----------: |
-| Bert-base     | 0.6507     | 0.1696     | 0.6707|  0.9344| 0.6411 | 0.3544 | 0.6887| 0.8734|
-| Bert-base post-pretrained     | 0.6287     | 0.1629     | 0.6922 | 0.9359 | 0.6144 | 0.3338 | 0.7001 | 0.8778|
-| Electra-base     | 0.6891     | 0.2457     | 0.5354|  0.8981| 0.6853 | 0.2727 | 0.5604| 0.8893|
-| Electra-base post-pretrained     | 0.6868     | 0.2089     | 0.5463|  0.9134| 0.6813 | 0.3050 | 0.5771| 0.8941|
+| :----------: | :-----------:  | :-----------: | :----------: | :-----------:  | :-----------: | :----------: | :-----------:  | :-----------: |
+| Bert-base     | 0.6507     |  0.1696     |   0.6707   |  0.9344 | 0.6411 | 0.3544 | 0.6887| 0.8734|
+| Bert-base post-pretrained     | 0.6287     |    0.1629     | 0.6922 | 0.9359 | 0.6144 | 0.3338 | 0.7001 | 0.8778|
+| Electra-base     | 0.6891     | 0.2457     |    0.5354 |  0.8981 | 0.6853 | 0.2727 | 0.5604| 0.8893|
+| Electra-base post-pretrained     | 0.6868     |    0.2089     | 0.5463  |  0.9134| 0.6813 | 0.3050 | 0.5771| 0.8941|

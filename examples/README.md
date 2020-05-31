@@ -13,7 +13,7 @@ A same head as SST-2 task is re-used in this experiment. For next step, more dif
 
 * __Results__  
 
-|       | Train loss after<br>training Head for 5 Epochs     | Train loss after<br>training all for 6 Epochs     | Train Accuracy after<br>training Head for 5 Epochs     | Train Accuracy after<br>training all for 6 Epochs     | Validation loss after<br>training Head for 5 Epochs     | Validation loss after<br>training all for 6 Epochs     | Validation Accuracy after<br>training Head for 5 Epochs     | Validation Accuracy after<br>training all for 6 Epochs (best)     |
+|    Models   | Train loss after<br>training Head for 5 Epochs     | Train loss after<br>training all for 6 Epochs     | Train Accuracy after<br>training Head for 5 Epochs     | Train Accuracy after<br>training all for 6 Epochs     | Validation loss after<br>training Head for 5 Epochs     | Validation loss after<br>training all for 6 Epochs     | Validation Accuracy after<br>training Head for 5 Epochs     | Validation Accuracy after<br>training all for 6 Epochs (best)     |
 | ---------- | :-----------:  | :-----------: | ---------- | :-----------:  | :-----------: | ---------- | :-----------:  | :-----------: |
 | Bert-base     | 0.6507     | 0.1696     | 0.6707|  0.9344| 0.6411 | 0.3544 | 0.6887| 0.8734|
 | Bert-base post-pretrained     | 0.6287     | 0.1629     | 0.6922 | 0.9359 | 0.6144 | 0.3338 | 0.7001 | 0.8778|

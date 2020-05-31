@@ -9,7 +9,7 @@ Post-pretrained model means that both of Bert-base-uncased and Electra-Discrimin
 
 
 * __Head for downstream task__  
-A same head as SST-2 task is re-used in this experiment. For next step, more different heads will be tested and documented.  
+A same head as SST-2 task is re-used in this experiment, namely using a binary classifier for the [CLS] token's hidden state output. For next step, more different heads will be tested and documented.  
 * __Hyper-Parameters__  
 
 |    H-Params   |   model configurations   |   leraning rate   |   warmup steps   |   train head epochs   | train all epochs |batch size of training| batch size of validation|layer-wise learning rate decay|

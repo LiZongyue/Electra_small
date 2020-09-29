@@ -1,5 +1,6 @@
 import torch.nn
 import copy
+import gc
 import torch
 
 from torch import nn
@@ -30,13 +31,13 @@ class Electra(nn.Module):
 
     def forward(self, data: torch.tensor):
         # A mask, which indicates whether the token in the data tensor is masked or not. Contains only boolean values.
-        x, mask_labels = data
+        data, mask_labels = data
         mask_labels = mask_labels.bool()
-        x = x.to(self.device)
+        data = data.to(self.device)
         mask_labels = mask_labels.to(self.device)
-        data_generator = copy.deepcopy(x)
+        data_generator = copy.deepcopy(data)
         data_generator[mask_labels] = 103
-        label_generator = copy.deepcopy(x)
+        label_generator = copy.deepcopy(data)
         label_generator[~mask_labels] = -100
         attention_mask = data_generator != 0
 
@@ -45,21 +46,22 @@ class Electra(nn.Module):
         attention_mask = attention_mask.to(self.device)
 
         score_generator = self._generator_(data_generator, attention_mask, masked_lm_labels=label_generator)
-        # TODO: ablations here. attention_mask is assigned.
+        gc.collect()
+
         loss_generator = score_generator[:1][0]
         output_generator = self.soft_max(score_generator)
         # Get the Softmax result for next step.
-        input_discriminator = torch.zeros_like(x)
+        input_discriminator = torch.zeros_like(data)
 
         input_discriminator[mask_labels] = output_generator[mask_labels]  # Part A
-        input_discriminator[~mask_labels] = x[~mask_labels]  # Part B
+        input_discriminator[~mask_labels] = data[~mask_labels]  # Part B
         # Input of the Discriminator will be replaced tokens (PartA) and non-replaced tokens (PartB)
-        labels_discriminator = torch.zeros_like(x)
+        labels_discriminator = torch.zeros_like(data)
         labels_discriminator[~mask_labels] = 0
-        labels_discriminator[mask_labels] = (1 - torch.eq(x[mask_labels], output_generator[mask_labels]).int()).long()
+        labels_discriminator[mask_labels] = (1 - torch.eq(data[mask_labels], output_generator[mask_labels]).int()).long()
         # If a token is replaced, 1 will be assigned to the discriminator's label, if not, 0 will be assigned.
         outputs_discriminator = self._discriminator_(input_discriminator, attention_mask, labels=labels_discriminator)
-        # TODO: ablations here. attention_mask is assigned.
+
         loss_discriminator = outputs_discriminator[:1][0]
 
         loss = loss_generator + self.train_config.lambda_ * loss_discriminator

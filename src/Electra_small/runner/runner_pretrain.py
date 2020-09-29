@@ -2,7 +2,7 @@ import math
 import torch
 import matplotlib.pyplot as plt
 
-# from apex import amp
+# from apex import amp  TODO: use apex to do half precision calculation
 from transformers import get_linear_schedule_with_warmup, AdamW
 
 

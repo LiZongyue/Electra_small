@@ -30,8 +30,8 @@ class BertForClassification(BertPreTrainedModel):
         """
         if attention_mask is None:
             attention_mask = input_ids != 0
-        bert_hidden_states = self.bert(input_ids, attention_mask, token_type_ids, position_ids, head_mask,
-                                                inputs_embeds)
+
+        bert_hidden_states = self.bert(input_ids, attention_mask, token_type_ids, position_ids, head_mask, inputs_embeds)
         bert_cls_output = bert_hidden_states[0][:, 0]  # load the hidden states of [CLS] token
         bert_cls_output = self.dropout(bert_cls_output)
 

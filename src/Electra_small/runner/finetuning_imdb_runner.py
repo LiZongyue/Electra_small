@@ -12,6 +12,7 @@ class FineTuningRunner:
         self.model_config = model_config
         self.train_config = train_config
         self.file_config = file_config
+        self.param_opt = None
         self.tokenizer = None
         self.model = None
 
@@ -30,10 +31,6 @@ class FineTuningRunner:
 
     def __tokenizer_getter__(self):
         return self.tokenizer
-
-    @staticmethod
-    def sigmoid(logits):
-        return 1 / (1 + np.exp(-logits))
 
     def run(self, train_dataloader, validation_dataloader, train_data_len, eval_dataloader):
         for epoch_id in range(self.train_config.train_head_epoch):
@@ -59,6 +56,7 @@ class FineTuningRunner:
             print(
                 f"Epoch {epoch_id}: train_loss={mean_loss_train:.4f}, train_acc={acc_tr:.4f}, "
                 f"valid_loss={mean_loss_val:.4f}, val_acc={acc_val:.4f}")
+        # TODO: find a data structure to move this ugly part
         loss_evaluation = []
         logits_eval = []
         labels_eval = []
@@ -68,11 +66,11 @@ class FineTuningRunner:
             logits_eval.append(logits_evaluation.detach().cpu().numpy())
             labels_eval.append(label_eval.cpu().numpy())
 
-        logits_eval = np.concatenate(logits_eval)
-        labels_eval = np.concatenate(labels_eval)
+        logits_eval = torch.tensor(np.concatenate(logits_eval))
+        labels_eval = torch.tensor(np.concatenate(labels_eval))
 
         mean_loss_eval = np.mean(np.array(loss_evaluation))
-        acc_eval = accuracy_score(labels_eval, (self.sigmoid(logits_eval) > 0.5).astype(int))
+        acc_eval = accuracy_score(labels_eval, ((torch.sigmoid(logits_eval).cpu().numpy()) > 0.5).astype(int))
 
         print(f"eval loss={mean_loss_eval:.4f}, eval acc={acc_eval:.4f}")
 
@@ -96,7 +94,7 @@ class FineTuningRunner:
                 raise Exception("Model is not recognized. Make sure your model is Bert base or Electra Base.")
 
         self.model.to(self.device)
-
+        # TODO: find a data structure to move this ugly part
         logits_train = []
         logits_val = []
         labels_train = []
@@ -117,16 +115,16 @@ class FineTuningRunner:
                 logits_val.append(logits_validation.detach().cpu().numpy())
                 labels_val.append(label_val.cpu().numpy())
 
-        logits_train = np.concatenate(logits_train)
+        logits_train = torch.tensor(np.concatenate(logits_train))
         labels_train = np.concatenate(labels_train)
 
-        logits_val = np.concatenate(logits_val)
+        logits_val = torch.tensor(np.concatenate(logits_val))
         labels_val = np.concatenate(labels_val)
 
         mean_loss_train = np.mean(np.array(loss_train))
         mean_loss_val = np.mean(np.array(loss_validation))
-        acc_tr = accuracy_score(labels_train, (self.sigmoid(logits_train) > 0.5).astype(int))
-        acc_val = accuracy_score(labels_val, (self.sigmoid(logits_val) > 0.5).astype(int))
+        acc_tr = accuracy_score(labels_train, ((torch.sigmoid(logits_train).cpu().numpy()) > 0.5).astype(int))
+        acc_val = accuracy_score(labels_val, ((torch.sigmoid(logits_val).cpu().numpy()) > 0.5).astype(int))
 
         return mean_loss_train, mean_loss_val, acc_tr, acc_val
 
